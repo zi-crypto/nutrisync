@@ -148,3 +148,4 @@ cython_debug/
 .adk/
 server_key.json
 nutrisync_adk/__pycache__/
+tests/
