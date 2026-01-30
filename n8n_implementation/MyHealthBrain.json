@@ -1,0 +1,1462 @@
+{
+  "name": "MyHealthBrain",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://yxudijlpccuwszvaimec.supabase.co/rest/v1/daily_goals?on_conflict=goal_date",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"goal_date\": \"{{ $json.goal_date }}\",\n  \"calories_consumed\": {{ $json.calories_consumed }},\n  \"workouts_completed\": {{ $json.workouts_completed }},\n  \"calorie_target\": {{ $json.calorie_target }},\n  \"workout_target\": {{ $json.workout_target }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        36768,
+        10736
+      ],
+      "id": "7952f8b5-7a4d-457c-abcd-18de80a90ce2",
+      "name": "Upsert Today Summary",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://yxudijlpccuwszvaimec.supabase.co/rest/v1/daily_goals?on_conflict=goal_date",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"goal_date\": \"{{ $json.goal_date }}\",\n  \"calories_consumed\": {{ $json.calories_consumed }},\n  \"workouts_completed\": {{ $json.workouts_completed }},\n  \"calorie_target\": {{ $json.calorie_target }},\n  \"workout_target\": {{ $json.workout_target }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        36384,
+        10736
+      ],
+      "id": "248bfe5e-5f51-4bb8-9ef8-089bb9fbc3f9",
+      "name": "Upsert Yesterday Summary",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Retreives high-level health scores (0-100) and improvement trends for Sleep, Nutrition, and Workouts. Use this for broad questions like \"How is my week going?\" or \"Am I improving?\".",
+        "workflowId": {
+          "__rl": true,
+          "value": "7NRre6odItewx7O2",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/7NRre6odItewx7O2",
+          "cachedResultName": "Tool: GetHealthScores"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        36976,
+        10416
+      ],
+      "id": "eac327cb-2535-42c5-840c-db630f720e3c",
+      "name": "GetHealthScores"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $json.output }}. {{ $json.error?$json.error:'' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        36912,
+        9968
+      ],
+      "id": "372fd2e0-b57c-40cd-833b-90cd9b78514a",
+      "name": "Reply",
+      "webhookId": "b419064b-040a-452b-85f1-5b2c591fb558",
+      "retryOnFail": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "2kRvMmSGzjjs8SD4",
+          "name": "Telegram account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "description": "don't forget to pass the value horizontal boolean\nif you don't want the graph to be horizontal just set it to false",
+        "workflowId": {
+          "__rl": true,
+          "value": "sGlYMrT7GjcZkInI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/sGlYMrT7GjcZkInI",
+          "cachedResultName": "DrawChart"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $json.message.chat.id }}",
+            "context": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('context', ``, 'string') }}",
+            "chart_config": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('chart_config', `MUST be a valid Chart.js json body parameters OBJECT`, 'json') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "chart_config",
+              "displayName": "chart_config",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        36832,
+        10400
+      ],
+      "id": "7a7eaad1-53a8-4b1d-a465-0bd2b687370e",
+      "name": "DrawChart"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-flash-preview",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        36432,
+        10432
+      ],
+      "id": "7aa85ba6-12ec-42c1-836d-89681db07dbc",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Yr1fNBusbyCUNPwx",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        36272,
+        10464
+      ],
+      "id": "4f9548cf-1342-427c-88c6-a80f81442f57",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "xQ2tL9arRJxvowDd",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FId4zqMnQzL2mkR3",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/FId4zqMnQzL2mkR3",
+          "cachedResultName": "AddRow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "type": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('type', ``, 'string') }}",
+            "data": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('data', ``, 'json') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        37104,
+        10416
+      ],
+      "id": "b0cae412-600c-4819-b600-beb545881e67",
+      "name": "AddRow"
+    },
+    {
+      "parameters": {
+        "url": "https://serpapi.com/search/",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "serpApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', ``, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        37216,
+        10416
+      ],
+      "id": "5ddb740e-656f-4b16-b003-4e077884f276",
+      "name": "GoogleSearch",
+      "credentials": {
+        "serpApi": {
+          "id": "7g1SgY2auDgjkvWT",
+          "name": "SerpAPI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        36144,
+        9872
+      ],
+      "id": "2844b7e5-0452-458c-9e05-0474dc71f641",
+      "name": "Telegram Trigger",
+      "webhookId": "6dec4fa5-2aa3-4987-9bbc-3fb9754f68c7",
+      "retryOnFail": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "2kRvMmSGzjjs8SD4",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "==CURRENT CONTEXT\nDate: {{ $now.setZone('Africa/Cairo').format('yyyy-MM-dd') }} ({{ $now.setZone('Africa/Cairo').format('EEEE') }})\nTime: {{ $now.setZone('Africa/Cairo').format('hh:mm a') }}\nin Cairo, Egypt (where Ziad Lives)\n\nZiad: {{ $json.message.text || $json.message.caption || \"[Image Attachment]\" }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "===ROLE & IDENTITY\nYou are \"\"NutriSync\"\": a sarcastic, witty, data-driven Sports Data Scientist & Hypertrophy Coach for Ziad (Machine Learning Specialist).\nGOAL: Manage Ziad's biological data for his \"\"Bulking\"\" phase (Target: 80kg).\nTONE: Sarcastic, verified data scientist. Roast him for poor discipline, praise him for gains. Be scientifically accurate but conversational. Concise output. Direct communication only.\n\n=DATABASE SCHEMA\n* **nutrition_logs:** { created_at (auto), food_item, calories (int), protein (int), carbs (int), fats (int), healthy (bool) }\n* **workout_logs:** { created_at (REQUIRED ISO-8601), workout_type, duration_minutes, calories_burned, max_heart_rate, heart_rate_recovery_dropped, aerobic_training_stress }\n* **sleep_logs:** { created_at (REQUIRED ISO-8601), night_sleep_hours, deep_sleep_percentage, light_sleep_percentage, rem_sleep_percentage, times_woke_up, sleep_score, sleep_start_time }\n* **body_composition_logs:** { created_at (auto), weight_kg, muscle_kg, bf_percent, water_percent, resting_hr, notes }\n* **daily_goals:** { goal_date, calories_consumed, workouts_completed, calorie_target, workout_target, calorie_target_met, workout_target_met }\n* **user_profile:** { id:1, height_cm, gender, dob, typical_daily_calories, typical_diet_type, allergies, fitness_goal, daily_calorie_target, workout_days_per_week, daily_protein_target_gm, daily_fats_target_gm, daily_carbs_target_gm, target_weight_kg }\n\n=LOGIC & PROTOCOLS (Strict Adherence)\n1.  **High-Level Analysis (The \"Analyst\" Layer):**\n    *   IF user asks broad questions like \"How is my week?\", \"Am I improving?\", or \"Check my status\", DO NOT scan raw logs manually.\n    *   **ALWAYS** call the `GetHealthScores` tool first.\n    *   **INTERPRETATION RULES (The \"Scorecard\" Mental Model):**\n        *   **Recent Score (0-100):** Performance vs Target.\n            *   **100:** \"Perfect\" (Hitting optimal frequency/volume).\n            *   **50:** \"Neutral\" (Meeting baseline expectations/averages).\n            *   **0:** \"Critical Failure\" (Severe underperformance or missing data).\n        *   **Improvement Score (0-100):** Recent vs Baseline.\n            *   **>50:** \"Improving\" (Doing better than before).\n            *   **50:** \"No Change\" (Stagnant).\n            *   **<50:** \"Regressing\" (Doing worse than before).\n            *   **0:** \"Drastic Dropdown\".\n        *   **Composite Score:** Your holistic \"Credit Score\". Dragged down heavily if any single domain is 0.\n        *   **Specific Logic:**\n            *   *Sleep:* Score >90 = Elite. Improvement <50 = Losing sleep duration.\n            *   *Nutrition:* Score 0 = Starvation mode (>80% deficit). Improvement 0 = Consistently failing.\n            *   *Workout:* Score <50 = Slacking. Improvement <20 = \"Crash\" (Intensity plummeted).\n    *   **Action:** Use these precise interpretations to roast or praise.\n\n2.  **Fasting (Mon/Thu):** Dawn to Sunset. No food logs allowed during daylight. Low calories (<1500) trigger a \"\"Eat more at night!\"\" warning. Workout Target = 0.\n\n3.  **Arnold Split:** Sequence: [Chest/Back] \"First\" -> [Shoulders/Arms] \"First\" -> [Legs] -> [Chest/Back] \"Second\" -> [Shoulders/Arms] \"Second\". If day missed: Suggest \"\"Make-Up Session,\"\" do not skip.\n\n4.  **Recovery Analysis:**\n    * *Sickness Zone:* RHR > 10% baseline (>80bpm) = ADVISE REST.\n    * *Crash Detection:* Weight drop >1kg/24h + HR Spike = Glycogen/Water Depletion (Not fat loss).\n    * *Multi-Factor:* If \"\"Why am I tired?\"\": Correlate Sleep Logs + Nutrition (Carbs) + Workout (Recovery).\n\n5.  **Bulking Hygiene:** Late-night eating (>10 PM) is GOOD (\"\"Overnight Muscle Fuel\"\").\n\n6.  **Visual Event Protocol (Food Logging):**\n    *   IF user sends a photo of FOOD:\n    *   Analyze the ingredients and estimated volume visually.\n    *   Estimate macros (Calories/Protein/Carbs/Fats) using internal knowledge + USDA standards.\n    *   Ask: \"Want to log this as [Food Name] (~[Cals] kcal)?\"\n    *   IF confirmed, call `AddRow` with type: `nutrition_logs`.\n\n7.  **Sensory Event Protocol (Screenshots):**\n    *   IF user sends a screenshot of a HEALTH APP (Huawei Health, Apple Health, etc.):\n    *   Extract the visible data points (Sleep stages, Heart rate, etc.) via Vision capabilities.\n    *   Map them strictly to the `sleep_logs` or `workout_logs` schema.\n    *   Ask: \"Log this sleep session ([Hours]h, [Deep]% Deep)?\"\n    *   IF confirmed, call `AddRow`.\n\n8. **Future Tense Handling:**\n    * If the user mentions food preparation actions (making, cooking, grabbing), assume they are consuming it immediately unless stated otherwise.\n    * If a food entity is detected in a future-tense sentence (e.g., 'I will eat'), trigger a clarifying question: 'Are you logging that [Food] now, or just planning it?'\n\n9. **Receipt Protocol (MANDATORY):**\n    * Every successful database write **must** be accompanied by a specific visual cue at the end of the message: `✅ Logged: <Item Name> (<Calories>kcal | <P>g P | <C>g C | <F>g F)` if food (of course), replace the food data with relevant data according to what are you exactly logging.\n    * This confirmation must be distinct from your conversational commentary.\n    * Example: \"Enjoy the gains, bro.\n      \n      ✅ Logged: Protein Shake (300kcal | 30g P | 10g C | 5g F)\"\n\n10. **Functional Day Protocol (Late Night Handling):**\n    * Your \"Day\" ends at **04:00 AM**, not midnight.\n    * IF the current time is between **00:00 AM and 04:00 AM**:\n        * Treat any logs (Food/Workout) as belonging to the **PREVIOUS** calendar day.\n        * **CRITICAL:** When calling `AddRow`, you MUST explicit set `created_at` to **23:59:59** of the *previous day*.\n        * *Example:* Current time is `Wednesday 02:00 AM`. User eats a snack.\n        * Action: `AddRow(type=\"nutrition_logs\", data={..., \"created_at\": \"Tuesday_Date T 23:59:59\"})`.\n        * This ensures the calories count towards Tuesday's daily target.\n\n11. **Tool Error Handling (Empty Output Protocol):**\n    * IF a tool (like `DrawChart` or `Supabase`) returns **NO OUTPUT** (Empty, Null, or Blank):\n    * **INTERPRETATION:** The tool **CRASHED** due to invalid input (e.g., malformed JSON config).\n    * **ACTION:** Do NOT ignore it. Do NOT say \"I drew the chart\" (Hallucination).\n    * **RECOVERY:** Automatically **RETRY** the tool with a **SIMPLIFIED** configuration or parameters.\n    * *Example:* If `DrawChart` returns empty, try sending a basic bar chart config without complex gradients or callbacks.\n\n12. **Real-Time Calculation Protocol (CRITICAL):**\n    *   **Logic:** The `daily_goals` table is for HISTORICAL records only. It is NOT real-time.\n    *   **Action for Status Checks:**\n        1.  IGNORE `daily_goals` when answering \"What's left?\" or \"Status?\".\n        2.  FETCH `nutrition_logs` where `created_at` is TODAY (as defined by the Functional Day Protocol Above).\n        3.  SUM the macros manually: `Sum(Calories)`, `Sum(Protein)`, `Sum(Carbs)`, `Sum(Fats)`.\n        4.  FETCH `user_profile` to get the Targets.\n        5.  CALCULATE Remaining: `Target - Sum`.\n    *   **Why:** This is the ONLY way to get real-time Macro (Protein/Carbs/Fats) tracking.\n\n\n=TOOL GUIDELINES\n* `GetHealthScores`: Broad status checks. Returns scores.\n* `GetMany...`:\n    * Filter Syntax: `column=operator.value`\n    * **CRITICAL TIME FORMAT:** Use strictly `YYYY-MM-DDTHH:mm:ss` (ISO-8601).\n    * **NO SPACES:** Never use spaces in timestamp strings.\n    * *Correct:* `created_at=gte.2025-11-19T00:00:00`\n    * *Wrong:* `created_at=gte.2025-11-19 00:00` (Causes DB Error).\n    * You must don't the comma and use an ampersand (&) to treat them as separate query parameters (When Chaining Conditions) Example: `created_at=gte.2026-01-18T00:00:00&created_at=lte.2026-01-18T23:59:59`.\n\n* `AddRow`: Use for text input or CONFIRMED image data. If input vague, ESTIMATE values but confirm with user.\nInputs Required:\n\n- type: The target table name string (nutrition_logs, workout_logs, sleep_logs, body_composition_logs).\n- data: A JSON object matching the table schema.\n\n  CRITICAL: IMMEDIEATLY After Logging any New Log (using `AddRow`) wether (Food/Sleep/Workout/...) Fetch Relevant data from Relevant tables and compare this log to it. Improving? or Not?. Graph if it is needed or is easier to share what your insights\n\n\n\nINTELLIGENT ESTIMATION RULE:\nIf the user provides vague input (e.g., \"\"I ate a medium banana\"\"), YOU must estimate the values based on standard nutritional data to fill the data object. (YOU HAVE TO ASK IF THE USER WOULD LIKE TO LOG THE CURRENT DATAPOINT OR NOT)\n\n\n\n=== EXAMPLES FOR 'AddRow' ===\n\n1.  **Nutrition (Food):** \"\"I ate a banana\"\"\n    `{\"\"type\"\":\"\"nutrition_logs\"\", \"\"data\"\": {\"\"food_item\"\": \"\"Medium Banana\"\", \"\"calories\"\": 105, \"\"protein\"\": 1, \"\"carbs\"\": 27, \"\"fats\"\": 0, \"\"healthy\"\": true}}`\n\n2.  **Workout (Running/Lifting):** \"\"Log a 5km run, took 30 mins\"\"\n    `{\"\"type\"\":\"\"workout_logs\"\", \"\"data\"\": {\"\"created_at\"\": \"\"current time ISO format\"\", \"\"workout_type\"\": \"\"Running\"\", \"\"duration_minutes\"\": 30, \"\"calories_burned\"\": 300, \"\"aerobic_training_stress\"\": 3.5}}`\n    *(IMPORTANT: 'workout_logs' has NO default timestamp. You MUST generate 'created_at' in ISO-8601 format.)*\n\n3.  **Sleep:** \"\"I slept 7h, deep sleep was 20%\"\"\n    `{\"\"type\"\":\"\"sleep_logs\"\", \"\"data\"\": {\"\"created_at\"\": \"current time ISO format\"\", \"\"night_sleep_hours\"\": 7, \"\"deep_sleep_percentage\"\": 20, \"\"sleep_score\"\": 85, \"\"sleep_start_time\"\": \"\"2023-10-27T23:00:00\"\"}}`\n    *(IMPORTANT: 'sleep_logs' has NO default timestamp. You MUST generate 'created_at'.)*\n\n4.  **Body Composition:** \"\"Weighed in at 75kg\"\"\n    `{\"\"type\"\":\"\"body_composition_logs\"\", \"\"data\"\": {\"\"weight_kg\"\": 75}}`\n\n\nMAKE SURE AddRow DIDN'T RETURN ANY ERRORS BEFORE TELLING ME \"\"Logged\"\"\n\n\n**B. ANALYSIS & VISUALIZATION (Chimera AI)**\n* `DrawChart`: For 'show', 'plot', 'trend' or if you just want to show me comparisons, trends,...\n\nParameters:\nchart_config: Chart.js Valid Json Parameters. (Use Very Expressive Styling for Charts, highlighting data points, shading time intervals, ... etc).\n\nSpecial Meals:\n - The **Protein Powerhouse**: is a sustained-release homemade mass gainer delivering 425 calories, 28.5g of protein, 38g of carbs, and 17g of healthy fats per 100g scoop.\n - Kariesh Smoothie: A creamy, slow-digesting strawberry cheesecake shake where every 350ml cup packs approximately 250 calories, 15.5g protein, 27g carbs, and 10g fat.\n\n=RESPONSE WORKFLOW\n1.  **Fetch:** `GetTodayGoal` + relevant logs. **CRITICAL:** IF user logs progress (Weight/Lifts/Sleep), you MUST call `GetMany...` (limit=5) to compare against previous history. \n2.  **Logic:** Apply Fasting/Recovery/Split protocols. Compare New vs Old (e.g., \"\"Weight up 8kg? Bulking working.\"\").\n3.  **Action:** Log data if requested -> Update Goal.\n4.  **Feedback:** Calculate remaining calories. Suggest meal (Light vs Feast) based on remainder.\n5.  **Output:** Witty Opening -> Data Insight (Bold numbers) -> Motivation/Next Step.\n6. Use Simple Consice English (don't use complicated english words)\n\n\nCRITICAL: STRICTLY REPLY IN TELEGRAM-COMPATIBLE HTML (Allowed: <b>, <i>, <u>, <s>, <a>, <code>, <pre>). Do NOT use <ul>, <ol>, <li>, <chart_image>, or <table>. Use dashes (-) for lists.\n\nCRITICAL: Start your response directly with the content. Do NOT type \"Bio-Hacking Jarvis:\".\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        36448,
+        9984
+      ],
+      "id": "fdc420fc-ea96-414d-9730-15e96bbfb9bf",
+      "name": "AnalysisAgent",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "nutrition_logs",
+        "limit": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Limit', ``, 'number') }}",
+        "filterType": "string",
+        "filterString": "={{ ($fromAI('Filters__String_', '', 'string') ? $fromAI('Filters__String_', '', 'string') + '&' : '') + 'order=created_at.desc' }}"
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        35968,
+        10384
+      ],
+      "id": "7c976797-7098-4536-8c5f-d85f4f05544a",
+      "name": "GetManyNutrition",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "workout_logs",
+        "limit": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Limit', ``, 'number') }}",
+        "filterType": "string",
+        "filterString": "={{ ($fromAI('Filters__String_', '', 'string') ? $fromAI('Filters__String_', '', 'string') + '&' : '') + 'order=created_at.desc' }}"
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        35840,
+        10400
+      ],
+      "id": "cad33622-1602-4d28-ad2f-369156d697e0",
+      "name": "GetManyWorkout",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "sleep_logs",
+        "limit": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Limit', ``, 'number') }}",
+        "filterType": "string",
+        "filterString": "={{ ($fromAI('Filters__String_', '', 'string') ? $fromAI('Filters__String_', '', 'string') + '&' : '') + 'order=created_at.desc' }}"
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        35952,
+        10256
+      ],
+      "id": "bafd93a5-4149-4444-8e54-01810609ac65",
+      "name": "GetManySleep",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "body_composition_logs",
+        "limit": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Limit', ``, 'number') }}",
+        "filterType": "string",
+        "filterString": "={{ ($fromAI('Filters__String_', '', 'string') ? $fromAI('Filters__String_', '', 'string') + '&' : '') + 'order=created_at.desc' }}"
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        35840,
+        10256
+      ],
+      "id": "d62ed29c-2677-41e9-8cf1-ff74fda8fdba",
+      "name": "GetManyBodyComposition",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "user_profile",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "1"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        35856,
+        10112
+      ],
+      "id": "ad33a767-33e0-4465-b78d-be19ac707486",
+      "name": "GetUserProfile",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "DEEP ANALYSIS TOOL. Uses advanced reasoning AI to find patterns and correlations.\n\nUSE FOR: 'why', 'what's affecting', 'correlate', 'analyze', 'explain', 'find patterns'\n\nPARAMETERS:\n- topic: Analysis topic (e.g., 'Fatigue Analysis')\n- context: User's original question\n- raw_data: Pass as JSON string using JSON.stringify()\n- user_goals: User's targets from profile\n- time_range: Period analyzed (e.g., 'Last 7 days')\n- comparison_note: Any comparisons\n\nWORKFLOW:\n1. Fetch ALL relevant data first\n2. Call DeepAnalyze with JSON.stringify() for raw_data\n3. Don't reply after - analysis sends directly",
+        "workflowId": {
+          "__rl": true,
+          "value": "fBjyZjjAE5fR6lRt",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/fBjyZjjAE5fR6lRt",
+          "cachedResultName": "DeepAnalyze"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $json.message.chat.id }}",
+            "topic": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('topic', `Analysis topic`, 'string') }}",
+            "context": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('context', `User's question`, 'string') }}",
+            "raw_data": "={{ typeof $fromAI('raw_data', `All fetched data`, 'json') === 'string' ? $fromAI('raw_data', `All fetched data`, 'json') : JSON.stringify($fromAI('raw_data', `All fetched data`, 'json')) }}",
+            "user_goals": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('user_goals', `User goals`, 'string') }}",
+            "time_range": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('time_range', `Time period`, 'string') }}",
+            "comparison_note": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('comparison_note', `Comparison notes`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "raw_data",
+              "displayName": "raw_data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "user_goals",
+              "displayName": "user_goals",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "time_range",
+              "displayName": "time_range",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "comparison_note",
+              "displayName": "comparison_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        37312,
+        10208
+      ],
+      "id": "5d684faf-6fb3-48a0-b802-88edae1dece6",
+      "name": "DeepAnalyze",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "daily_goals",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "=goal_date=eq.{{ $now.setZone('Africa/Cairo').format('yyyy-MM-dd') }}"
+      },
+      "position": [
+        35968,
+        10112
+      ],
+      "name": "GetTodayGoal",
+      "id": "6c9e8222-b386-4163-8da4-8e88391d51d1",
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9,12,15,18,21 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        37840,
+        10800
+      ],
+      "id": "5921e52c-7471-4c92-8e1d-a7c71559f81c",
+      "name": "Multiple Times Daily"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const now = new Date();\nconst hour = now.getHours();\nconst dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 4=Thu\nconst isFastingDay = (dayOfWeek === 1 || dayOfWeek === 4);\n\n// Determine what to remind based on time of day\nlet reminderType = '';\nlet message = '';\nlet shouldSend = true;\n\n// Add randomness - 40% chance to skip any given reminder\nif (Math.random() < 0.4) {\n  shouldSend = false;\n}\n\nif (shouldSend) {\n  if (hour >= 6 && hour < 10) {\n    // Morning: Breakfast + Scale\n    if (isFastingDay) {\n      reminderType = 'morning_fasting';\n      message = '🌅 **Morning Check-in!**\\n\\n📊 Time to weigh yourself and log your body composition!\\n\\n🍽️ Remember: Fasting today (Mon/Thu) - no breakfast needed, but plan your Iftar! 🌙';\n    } else {\n      reminderType = 'morning';\n      message = '🌅 **Morning Check-in!**\\n\\n📊 Did you weigh yourself? Log your body composition!\\n🍳 Log your breakfast to start tracking today\\'s calories!\\n\\n💪 Let\\'s make today count!';\n    }\n  } else if (hour >= 10 && hour < 14) {\n    // Midday: Lunch\n    if (isFastingDay) {\n      shouldSend = false; // Skip lunch reminder on fasting days\n    } else {\n      reminderType = 'lunch';\n      message = '🌮 **Lunch Time!**\\n\\n🍽️ Don\\'t forget to log your lunch!\\n\\nI\\'ll tell you how many calories you have left for the day. 📊';\n    }\n  } else if (hour >= 14 && hour < 17) {\n    // Afternoon: Snack or Workout reminder\n    const random = Math.random();\n    if (random < 0.5 && !isFastingDay) {\n      reminderType = 'snack';\n      message = '🍎 **Afternoon Snack?**\\n\\nIf you had a snack, log it so I can keep your calorie count accurate! 🥗';\n    } else if (!isFastingDay) {\n      reminderType = 'workout';\n      message = '💪 **Workout Time?**\\n\\nDid you hit the gym or go for a run? Log your workout!\\n\\nI\\'ll track your progress toward your weekly goal. 🏋️';\n    } else {\n      shouldSend = false;\n    }\n  } else if (hour >= 17 && hour < 20) {\n    // Evening: Dinner\n    reminderType = 'dinner';\n    if (isFastingDay) {\n      message = '🌙 **Iftar Time!**\\n\\n🍽️ Breaking your fast? Log your Iftar meal!\\n\\nMake sure to hit your calorie target tonight - no starving! 💪';\n    } else {\n      message = '🍝 **Dinner Time!**\\n\\n🍽️ Log your dinner to complete today\\'s nutrition tracking!\\n\\nI\\'ll let you know if you hit your calorie target. 🎯';\n    }\n  } else if (hour >= 20) {\n    // Night: Sleep reminder\n    reminderType = 'sleep';\n    message = '😴 **End of Day Check-in**\\n\\n🛏️ Before bed, did you log today\\'s sleep data from last night?\\n\\n📊 Complete tracking helps me analyze your patterns better!\\n\\nGood night! 🌙';\n  } else {\n    shouldSend = false;\n  }\n}\n\nreturn {\n  json: {\n    hour: hour,\n    reminderType: reminderType,\n    message: message,\n    shouldSend: shouldSend,\n    isFastingDay: isFastingDay\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        38048,
+        10800
+      ],
+      "id": "671bb454-5c01-487a-80db-4d19cbf23e1a",
+      "name": "Determine Reminder"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "should-send-reminder",
+              "leftValue": "={{ $json.shouldSend }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        38272,
+        10800
+      ],
+      "id": "5d1b6ff2-beb0-498b-80fb-4950e3463b52",
+      "name": "Should Send?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if user has logged anything yesterday\nconst hasLoggedYesterday = $input.all().length > 0;\nconst reminderData = $('Determine Reminder').first().json;\n\n// Adjust message if they haven't logged anything yet\nlet finalMessage = reminderData.message;\n\nif (!hasLoggedYesterday && reminderData.hour >= 12) {\n  finalMessage = '⚠️ **Hey! I haven\\'t seen any logs from you yesterday!**\\n\\n' + finalMessage + '\\n\\n_Building the habit means consistent tracking - even small entries count!_ 📝';\n}\n\nreturn {\n  json: {\n    message: finalMessage,\n    reminderType: reminderData.reminderType\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        38688,
+        10704
+      ],
+      "id": "51d21da3-77c9-4e10-ab0b-dd9fbff1f6de",
+      "name": "Prepare Message"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        38896,
+        10704
+      ],
+      "id": "66aa776d-c05a-4f4b-a5ca-4ae6890c4f72",
+      "name": "Send Reminder",
+      "webhookId": "b4f7fd29-d52a-482b-b9be-72b5ed062fb6",
+      "credentials": {
+        "telegramApi": {
+          "id": "2kRvMmSGzjjs8SD4",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "user_profile",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "1"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        35488,
+        10736
+      ],
+      "id": "a3e4a540-bc15-4b8f-9e86-a2d6f436b6b8",
+      "name": "Get User Targets",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Calculate if today requires a workout (not Mon or Thu)\nconst today = new Date();\ntoday.setHours(today.getHours() + 3);\nconst dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, 4=Thu\nconst workoutTargetToday = (dayOfWeek === 1 || dayOfWeek === 4) ? 0 : 1;\n\nreturn {\n  json: {\n    daily_calorie_target: $input.item.json.daily_calorie_target,\n    workout_days_per_week: $input.item.json.workout_days_per_week,\n    workout_target_today: workoutTargetToday\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        35680,
+        10736
+      ],
+      "id": "dd103ae7-93ed-4aa7-9a71-a2d187ce9596",
+      "name": "Calculate Workout Target"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "nutrition_logs",
+        "filterType": "string",
+        "filterString": "=created_at=gte.{{ $now.setZone('Africa/Cairo').minus({days: 1}).startOf('day').plus({hours: 4}).toUTC().toISO() }}&created_at=lt.{{ $now.setZone('Africa/Cairo').startOf('day').plus({hours: 4}).toUTC().toISO() }}"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        35856,
+        10640
+      ],
+      "id": "d7a734e2-1ec0-47dc-a3c7-3c41f9325cb0",
+      "name": "Get Yesterday Nutrition",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "workout_logs",
+        "filterType": "string",
+        "filterString": "=created_at=gte.{{ $now.setZone('Africa/Cairo').minus({days: 1}).startOf('day').plus({hours: 4}).toUTC().toISO() }}&created_at=lt.{{ $now.setZone('Africa/Cairo').startOf('day').plus({hours: 4}).toUTC().toISO() }}"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        35856,
+        10832
+      ],
+      "id": "6ca02db8-7e77-4388-86d7-70f03a0a792e",
+      "name": "Get Yesterday Workouts",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate yesterday's totals\nconst nutritionItems = $input.all().filter(item => item.json.calories !== undefined);\nconst workoutItems = $input.all().filter(item => item.json.workout_type !== undefined);\nconst userTargets = $('Calculate Workout Target').first().json;\n\nconst totalCalories = nutritionItems.reduce((sum, item) => sum + (item.json.calories || 0), 0);\nconst totalWorkouts = workoutItems.length;\n\nconst date = new Date();\ndate.setHours(date.getHours() + 3);\nconst yesterday = new Date(date);\nyesterday.setDate(yesterday.getDate() - 1);\nconst yesterdayDayOfWeek = yesterday.getDay();\nconst yesterdayWorkoutTarget = (yesterdayDayOfWeek === 1 || yesterdayDayOfWeek === 4) ? 0 : 1;\n\nconst calorieTargetMet = totalCalories >= userTargets.daily_calorie_target;\nconst workoutTargetMet = yesterdayWorkoutTarget === 0 ? true : totalWorkouts >= 1;\n\nreturn {\n  json: {\n    goal_date: yesterday.toISOString().split('T')[0],\n    calories_consumed: totalCalories,\n    workouts_completed: totalWorkouts,\n    calorie_target: userTargets.daily_calorie_target,\n    workout_target: yesterdayWorkoutTarget,\n    calorie_target_met: calorieTargetMet,\n    workout_target_met: workoutTargetMet\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        36224,
+        10736
+      ],
+      "id": "555545d1-e760-4765-8dc3-4df0be2a19e8",
+      "name": "Calculate Yesterday Summary"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Create today's goal entry data\nconst userTargets = $('Calculate Workout Target').first().json;\nconst date = new Date();\ndate.setHours(date.getHours() + 3);\nconst today = date.toISOString().split('T')[0];\n\nreturn {\n  json: {\n    goal_date: today,\n    calories_consumed: 0,\n    workouts_completed: 0,\n    calorie_target: userTargets.daily_calorie_target,\n    workout_target: userTargets.workout_target_today,\n    calorie_target_met: false,\n    workout_target_met: false\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        36576,
+        10736
+      ],
+      "id": "a8e9b7a9-928c-448f-a59e-419bfe6b757c",
+      "name": "Prepare Today Goal"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "daily_goals",
+        "filterType": "string",
+        "filterString": "calorie_target_met=eq.true&workout_target_met=eq.true"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        36944,
+        10736
+      ],
+      "id": "707ea43e-58b9-4665-b07b-779adeea3343",
+      "name": "Get Perfect Days",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate streak from perfect days\nconst perfectDays = $input.all();\nlet streak = 0;\n\nif (perfectDays.length > 0) {\n  // Sort by date descending\n  perfectDays.sort((a, b) => new Date(b.json.goal_date) - new Date(a.json.goal_date));\n  \n  // Count consecutive days from most recent\n  let currentDate = new Date(perfectDays[0].json.goal_date);\n  streak = 1;\n  \n  for (let i = 1; i < perfectDays.length; i++) {\n    const prevDate = new Date(perfectDays[i].json.goal_date);\n    const dayDiff = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));\n    \n    if (dayDiff === 1) {\n      streak++;\n      currentDate = prevDate;\n    } else {\n      break;\n    }\n  }\n}\n\nreturn {\n  json: {\n    streak: streak,\n    total_perfect_days: perfectDays.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        37120,
+        10736
+      ],
+      "id": "d05c5e0e-5834-4a2f-b350-ae54159710e3",
+      "name": "Calculate Streak"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "yesterday-was-perfect",
+              "leftValue": "={{ $('Calculate Yesterday Summary').item.json.calorie_target_met && $('Calculate Yesterday Summary').item.json.workout_target_met }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        37296,
+        10736
+      ],
+      "id": "ee74841c-ddbf-43bb-a558-b40d735de390",
+      "name": "Was Yesterday Perfect?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🎉 **Perfect Day Yesterday!** 🎉\n\n✅ Calories: **{{ $('Calculate Yesterday Summary').item.json.calories_consumed }}**/{{ $('Calculate Yesterday Summary').item.json.calorie_target }}\n✅ Workouts: **{{ $('Calculate Yesterday Summary').item.json.workouts_completed }}**/{{ $('Calculate Yesterday Summary').item.json.workout_target }}\n\n🔥 **Current Streak: {{ $('Calculate Streak').item.json.streak }} days**\n🏆 **Total Perfect Days: {{ $('Calculate Streak').item.json.total_perfect_days }}**\n\nKeep the momentum going today! 💪",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        37552,
+        10624
+      ],
+      "id": "f16d4357-fc6c-4c7b-b364-905bee9029de",
+      "name": "Send Celebration Message",
+      "webhookId": "b3a4ac46-2011-431c-b4ff-58531a096f62",
+      "credentials": {
+        "telegramApi": {
+          "id": "2kRvMmSGzjjs8SD4",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=📊 **Daily Reset Complete**\n\nYesterday's Summary:\n📍 Calories: **{{ $('Calculate Yesterday Summary').item.json.calories_consumed }}**/{{ $('Calculate Yesterday Summary').item.json.calorie_target }}\n📍 Workouts: **{{ $('Calculate Yesterday Summary').item.json.workouts_completed }}**/{{ $('Calculate Yesterday Summary').item.json.workout_target }}\n\n{{ $('Calculate Yesterday Summary').item.json.calorie_target_met ? '✅' : '❌' }} Calorie Target\n{{ $('Calculate Yesterday Summary').item.json.workout_target_met ? '✅' : '❌' }} Workout Target\n\n🔥 Current Streak: **{{ $('Calculate Streak').item.json.streak }} days**\n\nNew day, new goals! Let's make today count! 🚀",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        37552,
+        10880
+      ],
+      "id": "1be47172-8da0-4b63-a316-eb65016289ac",
+      "name": "Send Daily Summary",
+      "webhookId": "9844d1b8-5d32-4a76-932a-cca85d1b6fa8",
+      "credentials": {
+        "telegramApi": {
+          "id": "2kRvMmSGzjjs8SD4",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        35280,
+        10736
+      ],
+      "id": "9e533553-2149-4e1a-916d-973ebafe57dd",
+      "name": "4AM (Cairo Time)"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "nutrition_logs",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "=created_at=gte.{{ $now.startOf('day').minus(1, 'day').toISO() }}"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        38496,
+        10704
+      ],
+      "id": "e9c24f5a-a29d-4b32-9499-1eadec63f602",
+      "name": "Check Yesterday Logs",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        36080,
+        10736
+      ],
+      "id": "ee02a1d9-d1ad-44fe-8aba-fa56522ec9c9",
+      "name": "Merge Nutrition and Workouts"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.message.chat.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        36656,
+        10352
+      ],
+      "id": "636cfcf6-7ebf-4de9-96a4-b6bc0dadc64d",
+      "name": "Simple Memory"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "FormatErrorFeedback": {
+      "main": [
+        [
+          {
+            "node": "FormatErrorFeedback",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RetryLogic",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CheckForError",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AnalysisAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Yesterday Summary": {
+      "main": [
+        [
+          {
+            "node": "Prepare Today Goal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AnalysisAgent": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetHealthScores": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DrawChart": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AddRow": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GoogleSearch": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetManyNutrition": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetManyWorkout": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetManySleep": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetManyBodyComposition": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetUserProfile": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetTodayGoal": {
+      "ai_tool": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Multiple Times Daily": {
+      "main": [
+        [
+          {
+            "node": "Determine Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Reminder": {
+      "main": [
+        [
+          {
+            "node": "Should Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Send?": {
+      "main": [
+        [
+          {
+            "node": "Check Yesterday Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Message": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Targets": {
+      "main": [
+        [
+          {
+            "node": "Calculate Workout Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Workout Target": {
+      "main": [
+        [
+          {
+            "node": "Get Yesterday Nutrition",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Yesterday Workouts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Yesterday Nutrition": {
+      "main": [
+        [
+          {
+            "node": "Merge Nutrition and Workouts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Yesterday Workouts": {
+      "main": [
+        [
+          {
+            "node": "Merge Nutrition and Workouts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Calculate Yesterday Summary": {
+      "main": [
+        [
+          {
+            "node": "Upsert Yesterday Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Today Goal": {
+      "main": [
+        [
+          {
+            "node": "Upsert Today Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Today Summary": {
+      "main": [
+        [
+          {
+            "node": "Get Perfect Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Perfect Days": {
+      "main": [
+        [
+          {
+            "node": "Calculate Streak",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Streak": {
+      "main": [
+        [
+          {
+            "node": "Was Yesterday Perfect?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Was Yesterday Perfect?": {
+      "main": [
+        [
+          {
+            "node": "Send Celebration Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4AM (Cairo Time)": {
+      "main": [
+        [
+          {
+            "node": "Get User Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Yesterday Logs": {
+      "main": [
+        [
+          {
+            "node": "Prepare Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply": {
+      "main": [
+        [],
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Nutrition and Workouts": {
+      "main": [
+        [
+          {
+            "node": "Calculate Yesterday Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AnalysisAgent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6cd77b97-992d-4695-b8c9-acc7ffd80134",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "399cde5437e0834b9362557668ca4e4c17df2ca7891b93718b6fcb82619ee648"
+  },
+  "id": "wSYHdrw7FFdwsZWo",
+  "tags": []
+}

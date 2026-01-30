@@ -1,0 +1,8 @@
+.git
+.venv
+.env
+__pycache__
+*.pyc
+.DS_Store
+.adk/
+nutrisync_adk/__pycache__/

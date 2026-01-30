@@ -1,0 +1,97 @@
+{
+  "name": "Tool: GetHealthScores",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        21056,
+        5680
+      ],
+      "id": "326b89ce-5c3d-4bc0-98d2-77a172fc6d0e",
+      "name": "Execute Workflow Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://yxudijlpccuwszvaimec.supabase.co/functions/v1/user-improvement-scorer",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"user_id\": \"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\", \"persist\": false }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        21296,
+        5680
+      ],
+      "id": "d660467f-8f21-4832-b38f-20a4b5991694",
+      "name": "Call Edge Function",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Force output to be a stringified representation of the data\n// This helps the Agent 'see' the data as text instead of ignoring a JSON object\nconst data = $input.first().json;\nreturn {\n  json: {\n    output: JSON.stringify(data)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21520,
+        5680
+      ],
+      "id": "e40c6ad6-94b7-421a-96ec-4e9bf4bebfd3",
+      "name": "Format Output"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call Edge Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Edge Function": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e9dd66bf-135f-45fa-a5ac-5141cba1f81c",
+  "meta": {
+    "instanceId": "399cde5437e0834b9362557668ca4e4c17df2ca7891b93718b6fcb82619ee648"
+  },
+  "id": "7NRre6odItewx7O2",
+  "tags": []
+}

@@ -1,0 +1,9 @@
+google-genai
+google-adk
+python-dotenv
+supabase
+fastapi
+uvicorn
+pydantic
+pytz
+httpx

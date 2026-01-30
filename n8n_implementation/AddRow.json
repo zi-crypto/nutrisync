@@ -1,0 +1,218 @@
+{
+  "name": "AddRow",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\"type\":\"nutrition_logs\", \"data\": {\"food_item\": \"Medium Banana\", \"calories\": 105, \"protein\": 1, \"carbs\": 27, \"fats\": 0, \"healthy\": true}}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9b100504-5285-47f4-8f56-056976de0858",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "tableId": "={{ $('When Executed by Another Workflow').item.json.type }}",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        368,
+        0
+      ],
+      "id": "b644660b-0b19-42ad-a904-254dd6d64cd3",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kLEqIe59vmAYBLbJ",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ $json.data }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        0
+      ],
+      "id": "3ac61aab-6fd5-4d8f-bf72-d4325262458b",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "42b0fbb1-31c1-4f8b-9ac3-7dea61a32ca3",
+              "name": "type",
+              "value": "={{ $json.type }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -208,
+        128
+      ],
+      "id": "9382756f-d3d2-4a2c-8bcb-e64e715a5478",
+      "name": "Edit Fields1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Define allowed columns for each table to prevent errors\nconst allowedColumns = {\n  nutrition_logs: ['created_at', 'food_item', 'calories', 'protein', 'carbs', 'fats', 'healthy', 'image_analysis'],\n  workout_logs: ['workout_date_time', 'workout_type', 'duration_minutes', 'calories_burned', 'avg_heart_rate', 'max_heart_rate'],\n  sleep_logs: ['created_at', 'sleep_date', 'night_sleep_hours', 'deep_sleep_percentage', 'sleep_score'],\n  body_composition_logs: ['created_at', 'weight_kg', 'muscle_kg', 'bf_percent', 'hr_bpm']\n};\n\nconst tableType = $input.item.json.type;\nconst incomingData = $input.item.json.data;\nconst cleanData = {};\n\n// Only keep keys that exist in our allowed list\nif (allowedColumns[tableType]) {\n  for (const key of Object.keys(incomingData)) {\n    if (allowedColumns[tableType].includes(key)) {\n      cleanData[key] = incomingData[key];\n    }\n  }\n} else {\n  // Fallback if table not found in list, pass everything (risky)\n  Object.assign(cleanData, incomingData);\n}\n\nreturn { json: cleanData };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        -64
+      ],
+      "id": "2c9e14ac-fc82-45e2-8698-dfd39af52909",
+      "name": "Code in JavaScript",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\"status\": \"error\", \"message\": \"Error: {{ $json.error }}\"}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        112
+      ],
+      "id": "694a52ac-cd46-4ab1-9055-df9363793eac",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"status\": \"success\", \"message\": \"Successfully logged to database.\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        -48
+      ],
+      "id": "7a5ba398-bd94-4985-a219-03214c09244e",
+      "name": "Edit Fields3"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "update_id": 334284205,
+          "message": {
+            "message_id": 493,
+            "from": {
+              "id": 1843758554,
+              "is_bot": false,
+              "first_name": "Ziad",
+              "last_name": "Amer",
+              "username": "zmamer",
+              "language_code": "en"
+            },
+            "chat": {
+              "id": 1843758554,
+              "first_name": "Ziad",
+              "last_name": "Amer",
+              "username": "zmamer",
+              "type": "private"
+            },
+            "date": 1766232515,
+            "text": "Log a 5 km run it took me about 30 minutes again"
+          },
+          "data": {
+            "duration_minutes": 30,
+            "workout_type": "Running (5km)",
+            "aerobic_training_stress": 3,
+            "calories_burned": 350
+          },
+          "type": "workout_logs",
+          "toolCallId": "a6eed423-1f59-4f80-9bcb-e24d865d5812"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        []
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "23cbc087-9f2c-44aa-9347-188ad71cc40a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "399cde5437e0834b9362557668ca4e4c17df2ca7891b93718b6fcb82619ee648"
+  },
+  "id": "FId4zqMnQzL2mkR3",
+  "tags": []
+}
