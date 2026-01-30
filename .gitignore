@@ -150,5 +150,4 @@ server_key.json
 nutrisync_adk/__pycache__/
 tests/
 .context/
-.dockerignore
-.gitignore
+

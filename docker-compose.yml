@@ -2,7 +2,7 @@ services:
   nutrisync:
     # Replace ghcr.io/your-username/repo-name with your actual image name
     # For local testing you can use: build: .
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-owner}/nutrisync:latest
+    image: ghcr.io/zi-crypto/nutrisync:latest
     container_name: nutrisync_app
     ports:
       - "8000:8000"
