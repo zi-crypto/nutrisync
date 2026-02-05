@@ -6,7 +6,8 @@ from google.genai import types
 from .agents.coach import coach_agent, load_system_prompt
 from .managers.history import HistoryManager
 from .managers.context import ContextManager
-from .tools.utils import get_supabase_client
+from .tools.utils import get_supabase_client, CAIRO_TZ
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,21 @@ class NutriSyncRunner:
             for msg in history:
                 role = msg.get("role")
                 content = msg.get("content")
+                created_at = msg.get("created_at")
+
                 if role and content:
                     label = "User" if role == "user" else "Coach"
-                    history_text_lines.append(f"{label}: {content}")
+                    
+                    time_str = ""
+                    if created_at:
+                        try:
+                            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                            dt_cairo = dt.astimezone(CAIRO_TZ)
+                            time_str = f"[{dt_cairo.strftime('%Y-%m-%d %H:%M')}] "
+                        except Exception:
+                            pass
+
+                    history_text_lines.append(f"{time_str}{label}: {content}")
             
             # Join with newlines
             chat_history_str = "\n".join(history_text_lines)

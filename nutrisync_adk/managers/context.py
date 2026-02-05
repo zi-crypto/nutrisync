@@ -61,9 +61,27 @@ class ContextManager:
             # Fetch Persistent Context (Active Notes)
             active_notes = []
             try:
-                res = self.supabase.table("persistent_context").select("note_content").eq("is_active", True).execute()
+                res = self.supabase.table("persistent_context").select("note_content, created_at").eq("is_active", True).execute()
                 if res.data:
-                    active_notes = [n['note_content'] for n in res.data]
+                    from datetime import datetime
+                    from ..tools.utils import CAIRO_TZ
+                    
+                    for n in res.data:
+                        content = n['note_content']
+                        created_at = n.get('created_at')
+                        if created_at:
+                            try:
+                                # Parse ISO string (handle Z if present)
+                                dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                                # Convert to Cairo time
+                                dt_cairo = dt.astimezone(CAIRO_TZ)
+                                time_str = dt_cairo.strftime("%Y-%m-%d %H:%M")
+                                active_notes.append(f"{content} (Added: {time_str})")
+                            except Exception:
+                                active_notes.append(content)
+                        else:
+                            active_notes.append(content)
+
             except Exception as e:
                 logger.error(f"Error fetching active notes: {e}")
 
