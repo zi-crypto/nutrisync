@@ -27,7 +27,7 @@ def load_system_prompt() -> str:
 # Define the agent with tools bound
 coach_agent = Agent(
     name="coach_agent",
-    model="gemini-3-flash-preview", 
+    model="gemini-flash-latest", 
     generate_content_config={"temperature": 0.2},
     instruction=load_system_prompt(), # Initial static prompt, will be overridden/appended dynamically in runner
     tools=[
@@ -46,7 +46,7 @@ coach_agent = Agent(
         clear_status_note,
         get_active_notes_tool,
         draw_chart,
-        google_search,  # Built-in ADK tool for real-time search
+        # google_search,  # Built-in ADK tool for real-time search (Incompatible with tools in Gemini 1.5)
         get_fit_workouts,  # Google Fit workout sync
         get_fit_sleep  # Google Fit sleep sync
     ],

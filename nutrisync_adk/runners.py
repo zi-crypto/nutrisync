@@ -78,12 +78,23 @@ class NutriSyncRunner:
             active_notes_list = context_data.get("active_notes", [])
             active_notes_str = "\n".join([f"- {note}" for note in active_notes_list]) if active_notes_list else "None"
 
-            dynamic_instruction = self.base_system_prompt.format(
-                user_profile=json.dumps(context_data.get("profile", {}), indent=2),
-                daily_totals=json.dumps(context_data.get("daily_totals", {}), indent=2),
-                active_notes=active_notes_str,
-                chat_history=chat_history_str,
-                current_time=context_data.get("current_time", "Unknown")
+            # Sanitization for XML tagging Strategy
+            from xml.sax.saxutils import escape
+
+            def sanitize(val):
+                return escape(str(val))
+
+            # Use .replace() instead of .format() to avoid KeyError on JSON braces in the prompt
+            dynamic_instruction = self.base_system_prompt.replace(
+                "{user_profile}", sanitize(json.dumps(context_data.get("profile", {}), indent=2))
+            ).replace(
+                "{daily_totals}", sanitize(json.dumps(context_data.get("daily_totals", {}), indent=2))
+            ).replace(
+                "{active_notes}", sanitize(active_notes_str)
+            ).replace(
+                "{chat_history}", sanitize(chat_history_str)
+            ).replace(
+                "{current_time}", context_data.get("current_time", "Unknown")
             )
             
             # 3. Create Agent with Dynamic Instruction
