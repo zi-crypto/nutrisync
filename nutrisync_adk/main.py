@@ -86,3 +86,26 @@ async def telegram_webhook(update: TelegramUpdate, request: Request, background_
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# Chat API
+class ChatRequest(BaseModel):
+    message: str
+    guest_id: str
+
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest):
+    # Process
+    response = await runner.process_message(request.guest_id, request.message)
+    return response
+
+# Serve Static Files (Frontend)
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# Mount static directory
+app.mount("/static", StaticFiles(directory="nutrisync_adk/static"), name="static")
+
+# Serve index.html at root
+@app.get("/")
+async def serve_index():
+    return FileResponse("nutrisync_adk/static/index.html")
