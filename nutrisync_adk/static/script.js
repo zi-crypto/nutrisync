@@ -143,6 +143,60 @@ userInput.addEventListener('input', function () {
     this.style.height = (this.scrollHeight) + 'px';
 });
 
+async function loadHistory() {
+    try {
+        const response = await fetch(`/api/history/${GUEST_ID}`);
+        if (!response.ok) return;
+
+        const history = await response.json();
+        // Clear default message if history exists
+        if (history.length > 0) {
+            chatHistory.innerHTML = '';
+        }
+
+        history.forEach(msg => {
+            let chartData = null;
+
+            // Check for charts in tool_calls
+            if (msg.tool_calls) {
+                // Handle both array of dicts (from DB JSONB) and potential stringified variations
+                let tools = msg.tool_calls;
+                if (typeof tools === 'string') {
+                    try { tools = JSON.parse(tools); } catch (e) { }
+                }
+
+                if (Array.isArray(tools)) {
+                    const chartTool = tools.find(t => t.name === 'draw_chart');
+                    if (chartTool && chartTool.response) {
+                        let resp = chartTool.response;
+                        // It might be a stringified JSON if it was stored that way
+                        if (typeof resp === 'string') {
+                            try { resp = JSON.parse(resp); } catch (e) { }
+                        }
+
+                        if (resp.image_base64) {
+                            chartData = {
+                                image_base64: resp.image_base64,
+                                caption: resp.caption
+                            };
+                        }
+                    }
+                }
+            }
+
+            appendMessage(msg.role, msg.content, chartData);
+        });
+
+        scrollToBottom();
+
+    } catch (error) {
+        console.error("Failed to load history:", error);
+    }
+}
+
+// Init
+loadHistory();
+
 // Event Listeners
 sendBtn.addEventListener('click', sendMessage);
 

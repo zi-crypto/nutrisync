@@ -161,10 +161,17 @@ class NutriSyncRunner:
                                     }
                                     logger.info("Chart generated successfully, will be sent as photo")
                             
-                            # Track responses (truncate for history)
+                            # Track responses
+                            # Check if valid JSON object for cleaner storage
+                            final_response_data = response_data
+                            
+                            # Truncate logic: Only truncate if NOT draw_chart
+                            if part.function_response.name != "draw_chart":
+                                final_response_data = str(response_data)[:500]
+                            
                             tool_response_info = {
                                 "name": part.function_response.name,
-                                "response": str(response_data)[:500]  # Truncate long responses
+                                "response": final_response_data
                             }
                             collected_tool_calls.append(tool_response_info)
                 

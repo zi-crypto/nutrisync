@@ -121,6 +121,12 @@ async def chat_endpoint(request: ChatRequest):
     response = await runner.process_message(request.guest_id, request.message, image_bytes=image_bytes, mime_type=mime_type)
     return response
 
+@app.get("/api/history/{guest_id}")
+async def get_history(guest_id: str):
+    # Fetch history
+    history = await runner.history_manager.get_recent_history(guest_id, limit=50)
+    return history
+
 # Serve Static Files (Frontend)
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
