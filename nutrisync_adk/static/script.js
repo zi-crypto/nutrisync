@@ -166,10 +166,20 @@ async function loadHistory() {
                 }
 
                 if (Array.isArray(tools)) {
-                    const chartTool = tools.find(t => t.name === 'draw_chart');
-                    if (chartTool && chartTool.response) {
+                    // Look for ANY tool response that contains image_base64
+                    const chartTool = tools.find(t => {
+                        if (!t.response) return false;
+
+                        let r = t.response;
+                        if (typeof r === 'string') {
+                            try { r = JSON.parse(r); } catch (e) { return false; }
+                        }
+
+                        return r && r.image_base64;
+                    });
+
+                    if (chartTool) {
                         let resp = chartTool.response;
-                        // It might be a stringified JSON if it was stored that way
                         if (typeof resp === 'string') {
                             try { resp = JSON.parse(resp); } catch (e) { }
                         }

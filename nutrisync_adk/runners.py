@@ -166,7 +166,8 @@ class NutriSyncRunner:
                             final_response_data = response_data
                             
                             # Truncate logic: Only truncate if NOT draw_chart
-                            if part.function_response.name != "draw_chart":
+                            # Check loosely for draw_chart in case of naming variations
+                            if "draw_chart" not in part.function_response.name:
                                 final_response_data = str(response_data)[:500]
                             
                             tool_response_info = {
