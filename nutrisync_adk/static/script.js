@@ -156,8 +156,9 @@ async function loadHistory() {
 
         history.forEach(msg => {
             let chartData = null;
+            let userImageBase64 = null;
 
-            // Check for charts in tool_calls
+            // Check for charts or user images in tool_calls
             if (msg.tool_calls) {
                 // Handle both array of dicts (from DB JSONB) and potential stringified variations
                 let tools = msg.tool_calls;
@@ -166,7 +167,15 @@ async function loadHistory() {
                 }
 
                 if (Array.isArray(tools)) {
-                    // Look for ANY tool response that contains image_base64
+                    // Check for User Image
+                    const userImgTool = tools.find(t => t.name === 'user_image');
+                    if (userImgTool && userImgTool.image_base64) {
+                        // Assuming JPEG if not specified, but usually it is
+                        let mime = userImgTool.mime_type || 'image/jpeg';
+                        userImageBase64 = `data:${mime};base64,${userImgTool.image_base64}`;
+                    }
+
+                    // Check for Charts (ANY tool response that contains image_base64)
                     const chartTool = tools.find(t => {
                         if (!t.response) return false;
 
@@ -194,7 +203,7 @@ async function loadHistory() {
                 }
             }
 
-            appendMessage(msg.role, msg.content, chartData);
+            appendMessage(msg.role, msg.content, chartData, userImageBase64);
         });
 
         scrollToBottom();

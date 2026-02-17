@@ -114,7 +114,14 @@ class NutriSyncRunner:
             runner = Runner(agent=run_agent, session_service=self.session_service, app_name="NutriSync")
             
             # Save User Message to DB (Async ideally)
-            await self.history_manager.add_message(user_id, "user", text)
+            # WORKAROUND: Store user image in tool_calls column to persist it without schema change
+            user_tool_calls = None
+            if image_bytes and mime_type:
+                 import base64
+                 img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                 user_tool_calls = [{"name": "user_image", "image_base64": img_b64, "mime_type": mime_type}]
+
+            await self.history_manager.add_message(user_id, "user", text, tool_calls=user_tool_calls)
             
             # Prepare Message Parts
             parts = [types.Part(text=text)] if text else []
