@@ -88,14 +88,37 @@ async def health_check():
     return {"status": "healthy"}
 
 # Chat API
+# Chat API
+from typing import Optional
+import base64
+
 class ChatRequest(BaseModel):
     message: str
     guest_id: str
+    image: Optional[str] = None
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
+    image_bytes = None
+    mime_type = None
+
+    if request.image:
+        try:
+            # Handle data URI scheme if present (e.g. data:image/jpeg;base64,....)
+            if "," in request.image:
+                header, encoded = request.image.split(",", 1)
+                if ":" in header and ";" in header:
+                    mime_type = header.split(":")[1].split(";")[0]
+            else:
+                encoded = request.image
+                mime_type = "image/jpeg" # Fallback
+
+            image_bytes = base64.b64decode(encoded)
+        except Exception as e:
+            logger.error(f"Failed to decode image: {e}")
+
     # Process
-    response = await runner.process_message(request.guest_id, request.message)
+    response = await runner.process_message(request.guest_id, request.message, image_bytes=image_bytes, mime_type=mime_type)
     return response
 
 # Serve Static Files (Frontend)

@@ -4,19 +4,34 @@ const API_URL = "/api/chat";
 const chatHistory = document.getElementById('chat-history');
 const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
+const uploadBtn = document.getElementById('upload-btn');
+const fileInput = document.getElementById('file-input');
+const previewContainer = document.getElementById('image-preview-container');
+const imagePreview = document.getElementById('image-preview');
+const clearImageBtn = document.getElementById('clear-image');
+
+let currentImageBase64 = null;
 
 // Auto-scroll to bottom
 function scrollToBottom() {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-function appendMessage(role, text, chartData = null) {
+function appendMessage(role, text, chartData = null, imageBase64 = null) {
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('message');
     msgDiv.classList.add(role === 'user' ? 'user-message' : 'bot-message');
 
+    let contentHtml = "";
+
+    // If there's an image (for user messages primarily)
+    if (imageBase64) {
+        contentHtml += `<img src="${imageBase64}" style="max-width: 200px; border-radius: 8px; display: block; margin-bottom: 5px;">`;
+    }
+
     // Parse Markdown
-    msgDiv.innerHTML = marked.parse(text);
+    contentHtml += marked.parse(text || "");
+    msgDiv.innerHTML = contentHtml;
 
     chatHistory.appendChild(msgDiv);
 
@@ -51,24 +66,36 @@ function appendMessage(role, text, chartData = null) {
 
 async function sendMessage() {
     const text = userInput.value.trim();
-    if (!text) return;
 
-    // Clear input
+    if (!text && !currentImageBase64) return;
+
+    // Capture state
+    const msgText = text;
+    const msgImage = currentImageBase64;
+
+    // Clear input and preview
     userInput.value = '';
+    clearImage();
 
     // Append User Message
-    appendMessage('user', text);
+    appendMessage('user', msgText, null, msgImage);
 
     try {
+        const payload = {
+            guest_id: GUEST_ID,
+            message: msgText
+        };
+
+        if (msgImage) {
+            payload.image = msgImage;
+        }
+
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                message: text,
-                guest_id: GUEST_ID
-            })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -85,6 +112,30 @@ async function sendMessage() {
         appendMessage('model', '**Error**: Could not connect to the server.');
     }
 }
+
+// Image Handling
+uploadBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            currentImageBase64 = e.target.result;
+            imagePreview.src = currentImageBase64;
+            previewContainer.style.display = 'inline-block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+function clearImage() {
+    fileInput.value = '';
+    currentImageBase64 = null;
+    previewContainer.style.display = 'none';
+}
+
+clearImageBtn.addEventListener('click', clearImage);
 
 // Event Listeners
 sendBtn.addEventListener('click', sendMessage);
