@@ -11,6 +11,7 @@ from ..tools.context_notes import set_status_note, clear_status_note, get_active
 from ..tools.charts import draw_chart
 from ..tools.utils import get_health_scores
 from ..tools.google_fit import get_fit_workouts, get_fit_sleep
+# TODO: Add google search tool
 
 logger = logging.getLogger(__name__)
 

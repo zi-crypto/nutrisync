@@ -1,6 +1,7 @@
 services:
   nutrisync:
-    image: ghcr.io/zi-crypto/nutrisync:latest
+    # Your Docker Hub image
+    image: ziadmohamedamer/nutrisync:latest
     container_name: nutrisync_app
     # Expose port to other containers (Nginx) but not to host directly
     expose:
