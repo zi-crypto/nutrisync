@@ -137,11 +137,20 @@ function clearImage() {
 
 clearImageBtn.addEventListener('click', clearImage);
 
+// Auto-resize textarea
+userInput.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
 // Event Listeners
 sendBtn.addEventListener('click', sendMessage);
 
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
+userInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault(); // Prevent newline
         sendMessage();
+        // Reset height
+        userInput.style.height = 'auto';
     }
 });

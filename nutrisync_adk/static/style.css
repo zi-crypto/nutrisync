@@ -126,15 +126,22 @@ header {
     padding: 0;
 }
 
-input[type="text"] {
+textarea {
     flex: 1;
     padding: 12px 15px;
-    border-radius: 25px;
+    border-radius: 20px;
+    /* Slightly less rounded */
     border: none;
     background-color: var(--input-bg);
     color: #fff;
     outline: none;
     font-family: inherit;
+    resize: none;
+    /* Auto-resize via JS */
+    min-height: 20px;
+    max-height: 150px;
+    overflow-y: auto;
+    line-height: 1.5;
 }
 
 button {
@@ -149,6 +156,17 @@ button {
     cursor: pointer;
     color: #fff;
     transition: background-color 0.2s;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+}
+
+#upload-btn {
+    background-color: #4caf50;
+    /* Calm Green */
+}
+
+#upload-btn:hover {
+    background-color: #388e3c;
 }
 
 button:hover {
