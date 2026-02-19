@@ -33,6 +33,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    labels:
+      - "com.github.nginx-proxy.nginx=true"
     volumes:
       - certs:/etc/nginx/certs
       - vhost:/etc/nginx/vhost.d
@@ -51,6 +53,7 @@ services:
       - acme:/etc/acme.sh
     environment:
       - DEFAULT_EMAIL=${EMAIL}
+      - NGINX_PROXY_CONTAINER=nginx-proxy
     restart: always
 
 volumes:
