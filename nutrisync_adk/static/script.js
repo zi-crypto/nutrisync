@@ -1,42 +1,213 @@
-const GUEST_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-const API_URL = "/api/chat";
+// NutriSync Chat Application
+// Implements the Premium Glassmorphism UI logic and State Management
 
-const chatHistory = document.getElementById('chat-history');
-const userInput = document.getElementById('user-input');
-const sendBtn = document.getElementById('send-btn');
-const uploadBtn = document.getElementById('upload-btn');
-const fileInput = document.getElementById('file-input');
-const previewContainer = document.getElementById('image-preview-container');
-const imagePreview = document.getElementById('image-preview');
-const clearImageBtn = document.getElementById('clear-image');
-
-let currentImageBase64 = null;
-
-// Auto-scroll to bottom
-function scrollToBottom() {
-    chatHistory.scrollTop = chatHistory.scrollHeight;
-}
-
-function appendMessage(role, text, chartData = null, imageBase64 = null) {
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('message');
-    msgDiv.classList.add(role === 'user' ? 'user-message' : 'bot-message');
-
-    let contentHtml = "";
-
-    // If there's an image (for user messages primarily)
-    if (imageBase64) {
-        contentHtml += `<img src="${imageBase64}" style="max-width: 200px; border-radius: 8px; display: block; margin-bottom: 5px;">`;
+class ChatCache {
+    constructor(userId) {
+        this.userId = userId;
+        this.dbName = `NutriSyncDB_${userId}`; // Scope DB by User ID
+        this.storeName = 'chat_history';
+        this.db = null;
     }
 
-    // Parse Markdown
-    contentHtml += marked.parse(text || "");
-    msgDiv.innerHTML = contentHtml;
+    async open() {
+        if (!this.userId) return; // Cannot open without user ID
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, 1);
 
-    chatHistory.appendChild(msgDiv);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    const store = db.createObjectStore(this.storeName, { keyPath: 'id' });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+            };
 
-    // Render Chart if available
-    if (chartData && chartData.image_base64) {
+            request.onsuccess = (event) => {
+                this.db = event.target.result;
+                resolve(this.db);
+            };
+
+            request.onerror = (event) => {
+                reject('IndexedDB Error: ' + event.target.error);
+            };
+        });
+    }
+
+    async saveMessages(messages) {
+        if (!this.db) await this.open();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+
+            messages.forEach(msg => {
+                // Ensure we have an ID. If not, we can't cache effectively with keyPath 'id'
+                // Supabase usually provides one.
+                if (msg.id) {
+                    store.put(msg);
+                }
+            });
+
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = (e) => reject(e);
+        });
+    }
+
+    async getAllMessages() {
+        if (!this.db) await this.open();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readonly');
+            const store = transaction.objectStore(this.storeName);
+            const index = store.index('created_at');
+            const request = index.getAll();
+
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = (e) => reject(e);
+        });
+    }
+
+    async getLatestTimestamp() {
+        if (!this.db) await this.open();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readonly');
+            const store = transaction.objectStore(this.storeName);
+            const index = store.index('created_at');
+            const request = index.openCursor(null, 'prev');
+
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    resolve(cursor.value.created_at);
+                } else {
+                    resolve(null);
+                }
+            };
+            request.onerror = (e) => reject(e);
+        });
+    }
+}
+
+class ChatApp {
+    constructor() {
+        this.API_URL = "/api/chat";
+        this.HISTORY_URL = "/api/history/";
+        this.PROFILE_URL = "/api/profile/";
+
+        // State
+        this.userId = null; // Will be set by Auth
+        this.currentImageBase64 = null;
+        this.isTyping = false;
+
+        // DOM Elements
+        this.chatHistory = document.getElementById('chat-history');
+        this.userInput = document.getElementById('user-input');
+        this.sendBtn = document.getElementById('send-btn');
+        this.uploadBtn = document.getElementById('upload-btn');
+        this.fileInput = document.getElementById('file-input');
+        this.previewContainer = document.getElementById('image-preview-container');
+        this.imagePreview = document.getElementById('image-preview');
+        this.clearImageBtn = document.getElementById('clear-image');
+
+        // Initialize
+        this.init();
+    }
+
+    init() {
+        // Event Listeners
+        this.sendBtn.addEventListener('click', () => this.sendMessage());
+        this.userInput.addEventListener('keydown', (e) => this.handleEnterKey(e));
+        this.uploadBtn.addEventListener('click', () => this.fileInput.click());
+        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        this.clearImageBtn.addEventListener('click', () => this.clearImage());
+        this.userInput.addEventListener('input', (e) => this.autoResizeInput(e.target));
+    }
+
+    // Auth handled externally, this just sets ID
+    setUserId(id) {
+        this.userId = id;
+    }
+
+    scrollToBottom() {
+        this.chatHistory.scrollTop = this.chatHistory.scrollHeight;
+    }
+
+    showTypingIndicator() {
+        if (this.isTyping) return;
+        this.isTyping = true;
+
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'typing-indicator';
+        typingDiv.id = 'typing-indicator';
+        typingDiv.innerHTML = `
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+        `;
+        this.chatHistory.appendChild(typingDiv);
+        typingDiv.style.display = 'block';
+        this.scrollToBottom();
+    }
+
+    hideTypingIndicator() {
+        const indicator = document.getElementById('typing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+        this.isTyping = false;
+    }
+
+    appendMessage(role, text, chartData = null, imageBase64 = null) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message');
+        msgDiv.classList.add(role === 'user' ? 'user-message' : 'bot-message');
+
+        let contentHtml = "";
+
+        // Image
+        if (imageBase64) {
+            contentHtml += `<img src="${imageBase64}" style="max-width: 200px; border-radius: 12px; display: block; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.1);">`;
+        }
+
+        // Markdown
+        // Check if marked is available
+        if (typeof marked !== 'undefined' && text) {
+            contentHtml += marked.parse(text);
+        } else {
+            contentHtml += `<p>${text || ""}</p>`;
+        }
+
+        msgDiv.innerHTML = contentHtml;
+
+        // Render LaTeX (KaTeX)
+        try {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(msgDiv, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\(', right: '\\)', display: false },
+                        { left: '\\[', right: '\\]', display: true }
+                    ],
+                    throwOnError: false
+                });
+            }
+        } catch (e) {
+            console.warn("KaTeX rendering failed:", e);
+        }
+
+        // Remove typing indicator if it exists (to insert before it? Or just remove it)
+        // Usually we hide indicator before appending.
+
+        this.chatHistory.appendChild(msgDiv);
+
+        // Chart
+        if (chartData && chartData.image_base64) {
+            this.appendChart(chartData);
+        }
+
+        this.scrollToBottom();
+    }
+
+    appendChart(chartData) {
         const chartContainer = document.createElement('div');
         chartContainer.classList.add('chart-container');
 
@@ -44,146 +215,182 @@ function appendMessage(role, text, chartData = null, imageBase64 = null) {
         img.src = `data:image/png;base64,${chartData.image_base64}`;
         img.alt = chartData.caption || "Chart";
         img.style.maxWidth = "100%";
+        img.style.borderRadius = "8px";
 
         chartContainer.appendChild(img);
 
-        // Add caption if present
         if (chartData.caption) {
             const caption = document.createElement('div');
-            caption.style.color = '#333';
-            caption.style.fontSize = '0.8rem';
-            caption.style.marginTop = '5px';
+            caption.style.color = '#8b949e';
+            caption.style.fontSize = '0.85rem';
+            caption.style.marginTop = '8px';
             caption.style.textAlign = 'center';
             caption.innerText = chartData.caption;
             chartContainer.appendChild(caption);
         }
 
-        chatHistory.appendChild(chartContainer);
+        this.chatHistory.appendChild(chartContainer);
     }
 
-    scrollToBottom();
-}
+    async sendMessage() {
+        const text = this.userInput.value.trim();
+        const image = this.currentImageBase64;
 
-async function sendMessage() {
-    const text = userInput.value.trim();
+        if (!text && !image) return;
 
-    if (!text && !currentImageBase64) return;
+        // Optimistic UI
+        this.appendMessage('user', text, null, image);
 
-    // Capture state
-    const msgText = text;
-    const msgImage = currentImageBase64;
+        // Clear UI
+        this.userInput.value = '';
+        this.userInput.style.height = 'auto'; // Reset height
+        this.clearImage();
 
-    // Clear input and preview
-    userInput.value = '';
-    clearImage();
+        this.showTypingIndicator();
 
-    // Append User Message
-    appendMessage('user', msgText, null, msgImage);
+        try {
+            const payload = {
+                guest_id: this.userId,
+                message: text,
+                image: image
+            };
 
-    try {
-        const payload = {
-            guest_id: GUEST_ID,
-            message: msgText
-        };
+            const response = await fetch(this.API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        if (msgImage) {
-            payload.image = msgImage;
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+
+            this.hideTypingIndicator();
+            this.appendMessage('model', data.text, data.chart);
+
+        } catch (error) {
+            console.error('Send Error:', error);
+            this.hideTypingIndicator();
+            this.appendMessage('model', `**Error**: Failed to communicate with the server. (${error.message})`);
         }
-
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Append Bot Response
-        appendMessage('model', data.text, data.chart);
-
-    } catch (error) {
-        console.error('Error:', error);
-        appendMessage('model', '**Error**: Could not connect to the server.');
     }
-}
 
-// Image Handling
-uploadBtn.addEventListener('click', () => fileInput.click());
+    handleEnterKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.sendMessage();
+        }
+    }
 
-fileInput.addEventListener('change', () => {
-    const file = fileInput.files[0];
-    if (file) {
+    handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
         const reader = new FileReader();
         reader.onload = (e) => {
-            currentImageBase64 = e.target.result;
-            imagePreview.src = currentImageBase64;
-            previewContainer.style.display = 'inline-block';
+            this.currentImageBase64 = e.target.result;
+            this.imagePreview.src = this.currentImageBase64;
+            this.previewContainer.style.display = 'inline-block';
         };
         reader.readAsDataURL(file);
     }
-});
 
-function clearImage() {
-    fileInput.value = '';
-    currentImageBase64 = null;
-    previewContainer.style.display = 'none';
-}
+    clearImage() {
+        this.fileInput.value = '';
+        this.currentImageBase64 = null;
+        this.previewContainer.style.display = 'none';
+    }
 
-clearImageBtn.addEventListener('click', clearImage);
+    autoResizeInput(element) {
+        element.style.height = 'auto';
+        element.style.height = (element.scrollHeight) + 'px';
+    }
 
-// Auto-resize textarea
-userInput.addEventListener('input', function () {
-    this.style.height = 'auto';
-    this.style.height = (this.scrollHeight) + 'px';
-});
+    async loadHistory() {
+        if (!this.userId) return;
 
-async function loadHistory() {
-    try {
-        const response = await fetch(`/api/history/${GUEST_ID}`);
-        if (!response.ok) return;
+        try {
+            // 1. Initialize Cache with user ID
+            this.cache = new ChatCache(this.userId);
+            await this.cache.open();
 
-        const history = await response.json();
-        // Clear default message if history exists
-        if (history.length > 0) {
-            chatHistory.innerHTML = '';
+            // 2. Load and render cached messages immediately
+            const cachedMessages = await this.cache.getAllMessages();
+            if (cachedMessages.length > 0) {
+                this.chatHistory.innerHTML = '';
+                this.renderMessages(cachedMessages);
+            }
+
+            // 3. Check for new messages
+            const lastTimestamp = await this.cache.getLatestTimestamp();
+            let url = `${this.HISTORY_URL}${this.userId}`;
+            if (lastTimestamp) {
+                url += `?after=${encodeURIComponent(lastTimestamp)}`;
+            }
+
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("History fetch failed");
+
+            const newMessages = await response.json();
+
+            // 4. Save and append new messages
+            if (newMessages.length > 0) {
+                await this.cache.saveMessages(newMessages);
+
+                // If we had no cache, clear the "welcome" text
+                if (cachedMessages.length === 0) {
+                    this.chatHistory.innerHTML = '';
+                }
+
+                this.renderMessages(newMessages);
+            }
+
+            this.scrollToBottom();
+
+        } catch (error) {
+            console.error("History Load Error:", error);
         }
+    }
 
-        history.forEach(msg => {
+    renderMessages(messages) {
+        messages.forEach(msg => {
             let chartData = null;
             let userImageBase64 = null;
 
-            // Check for charts or user images in tool_calls
-            if (msg.tool_calls) {
-                // Handle both array of dicts (from DB JSONB) and potential stringified variations
+            // Image Handling
+            if (msg.image_data) {
+                userImageBase64 = msg.image_data;
+            } else if (msg.tool_calls) {
+                // Legacy Fallback
                 let tools = msg.tool_calls;
                 if (typeof tools === 'string') {
                     try { tools = JSON.parse(tools); } catch (e) { }
                 }
 
                 if (Array.isArray(tools)) {
-                    // Check for User Image
-                    const userImgTool = tools.find(t => t.name === 'user_image');
-                    if (userImgTool && userImgTool.image_base64) {
-                        // Assuming JPEG if not specified, but usually it is
-                        let mime = userImgTool.mime_type || 'image/jpeg';
-                        userImageBase64 = `data:${mime};base64,${userImgTool.image_base64}`;
+                    // User Image
+                    const userImg = tools.find(t => t.name === 'user_image');
+                    if (userImg) {
+                        userImageBase64 = `data:${userImg.mime_type || 'image/jpeg'};base64,${userImg.image_base64}`;
                     }
+                }
+            }
 
-                    // Check for Charts (ANY tool response that contains image_base64)
+            // Chart Parsing
+            if (msg.tool_calls) {
+                let tools = msg.tool_calls;
+                if (typeof tools === 'string') {
+                    try { tools = JSON.parse(tools); } catch (e) { }
+                }
+
+                if (Array.isArray(tools)) {
+                    // Chart
                     const chartTool = tools.find(t => {
                         if (!t.response) return false;
-
                         let r = t.response;
                         if (typeof r === 'string') {
                             try { r = JSON.parse(r); } catch (e) { return false; }
                         }
-
                         return r && r.image_base64;
                     });
 
@@ -192,38 +399,618 @@ async function loadHistory() {
                         if (typeof resp === 'string') {
                             try { resp = JSON.parse(resp); } catch (e) { }
                         }
-
-                        if (resp.image_base64) {
-                            chartData = {
-                                image_base64: resp.image_base64,
-                                caption: resp.caption
-                            };
-                        }
+                        chartData = {
+                            image_base64: resp.image_base64,
+                            caption: resp.caption
+                        };
                     }
                 }
             }
 
-            appendMessage(msg.role, msg.content, chartData, userImageBase64);
+            this.appendMessage(msg.role, msg.content, chartData, userImageBase64);
         });
+    }
 
-        scrollToBottom();
-
-    } catch (error) {
-        console.error("Failed to load history:", error);
+    clearChat() {
+        this.chatHistory.innerHTML = '';
+        const welcome = document.createElement('div');
+        welcome.className = 'message bot-message';
+        welcome.innerText = "Hello! I'm your NutriSync coach. How can I help you today?";
+        this.chatHistory.appendChild(welcome);
     }
 }
 
-// Init
-loadHistory();
+// Auth & App Initialization
+document.addEventListener('DOMContentLoaded', async () => {
+    // SUPABASE CONFIGURATION
+    const SUPABASE_URL = 'https://yxudijlpccuwszvaimec.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_m6AFUpWRwLDOlak4MuqL-w_ljz3-lrF';
 
-// Event Listeners
-sendBtn.addEventListener('click', sendMessage);
-
-userInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault(); // Prevent newline
-        sendMessage();
-        // Reset height
-        userInput.style.height = 'auto';
+    if (typeof supabase === 'undefined') {
+        console.error("Supabase Client not loaded.");
+        return;
     }
+
+    const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.app = new ChatApp();
+
+    // DOM Elements - Auth & Wizard
+    const authOverlay = document.getElementById('auth-overlay');
+    const authForm = document.getElementById('auth-form');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const authSubmitBtn = document.getElementById('auth-submit-btn');
+    const authToggleBtn = document.getElementById('auth-toggle-btn');
+    const authToggleText = document.getElementById('auth-toggle-text');
+    const authTitle = document.getElementById('auth-title');
+    const authMessage = document.getElementById('auth-message');
+
+    const onboardingOverlay = document.getElementById('onboarding-overlay');
+    const onboardingForm = document.getElementById('onboarding-form');
+    const wizardNextBtn = document.getElementById('wizard-next-btn');
+    const wizardBackBtn = document.getElementById('wizard-back-btn');
+    const wizardSubmitBtn = document.getElementById('wizard-submit-btn');
+    const wizardTitle = document.getElementById('wizard-title');
+    const wizardSubtitle = document.getElementById('wizard-subtitle');
+
+    const logoutBtn = document.createElement('button'); // Create Logout Button
+    logoutBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+    `;
+    logoutBtn.title = "Sign Out";
+    logoutBtn.style.marginLeft = "auto";
+    logoutBtn.addEventListener('click', handleLogout);
+    document.querySelector('header').appendChild(logoutBtn);
+
+    // --- Auth Logic ---
+    let isSignUp = false;
+
+    // Toggle Sign In / Sign Up
+    authToggleBtn.addEventListener('click', () => {
+        isSignUp = !isSignUp;
+        if (isSignUp) {
+            authTitle.innerText = "Create Account";
+            authSubmitBtn.innerText = "Sign Up";
+            authToggleText.innerText = "Already have an account?";
+            authToggleBtn.innerText = "Sign In";
+        } else {
+            authTitle.innerText = "Welcome Back";
+            authSubmitBtn.innerText = "Sign In";
+            authToggleText.innerText = "Don't have an account?";
+            authToggleBtn.innerText = "Sign Up";
+        }
+        authMessage.innerText = "";
+    });
+
+    // Handle Form Submit
+    authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = emailInput.value;
+        const password = passwordInput.value;
+
+        authMessage.innerText = "Processing...";
+        authMessage.className = "auth-message";
+
+        try {
+            if (isSignUp) {
+                // Validate Password Strength briefly (client side)
+                if (password.length < 8) {
+                    throw new Error("Password must be at least 8 characters");
+                }
+                const { data, error } = await sbClient.auth.signUp({
+                    email: email,
+                    password: password
+                });
+                if (error) throw error;
+                authMessage.innerText = "Check your email for the confirmation link!";
+                authMessage.classList.add("success");
+            } else {
+                const { data, error } = await sbClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                if (error) throw error;
+                // Success - onAuthStateChange will handle the rest
+            }
+        } catch (error) {
+            authMessage.innerText = error.message;
+            authMessage.classList.add("error");
+        }
+    });
+
+    async function handleLogout() {
+        const { error } = await sbClient.auth.signOut();
+        if (error) console.error("Sign out error", error);
+        // Clean cache handled by onAuthStateChange logic partially, 
+        // but we explicitly remove LocalStorage
+        localStorage.removeItem('nutrisync_user_id');
+        window.location.reload(); // Hard reload to clear everything
+    }
+
+    // --- Onboarding Logic ---
+    let currentStep = 1;
+    const totalSteps = 6; // Updated to 6 (Sport/Split added)
+
+    // Split Templates
+    const splitTemplates = {
+        "PPL": ["Push", "Pull", "Legs", "Rest"],
+        "Bro Split": ["Chest", "Back", "Legs", "Shoulders", "Arms", "Rest", "Rest"],
+        "Upper Lower": ["Upper", "Lower", "Rest", "Upper", "Lower", "Rest", "Rest"],
+        "Full Body": ["Full Body A", "Rest", "Full Body B", "Rest", "Full Body A", "Rest", "Rest"],
+        "Custom": ["Day 1"]
+    };
+
+    function showStep(step) {
+        document.querySelectorAll('.wizard-step').forEach(el => el.classList.add('hidden'));
+        document.querySelector(`.wizard-step[data-step="${step}"]`).classList.remove('hidden');
+
+        // Buttons
+        if (step === 1) {
+            wizardBackBtn.classList.add('hidden');
+        } else {
+            wizardBackBtn.classList.remove('hidden');
+        }
+
+        if (step === totalSteps) {
+            wizardNextBtn.classList.add('hidden');
+            wizardSubmitBtn.classList.remove('hidden');
+        } else {
+            wizardNextBtn.classList.remove('hidden');
+            wizardSubmitBtn.classList.add('hidden');
+        }
+
+        wizardSubtitle.innerText = `Step ${step} of ${totalSteps}`;
+    }
+
+    // Split Editor Functions
+    function renderSplitEditor(days) {
+        const container = document.getElementById('split-editor-container');
+        const addBtn = document.getElementById('add-split-day-btn');
+        container.innerHTML = '';
+
+        days.forEach((day, index) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = day;
+            input.className = 'split-day-input';
+            input.placeholder = `Day ${index + 1}`;
+            input.style.flex = '1';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.innerText = '×';
+            removeBtn.className = 'secondary-btn';
+            removeBtn.style.padding = '4px 8px';
+            removeBtn.style.color = '#f85149';
+            removeBtn.style.borderColor = 'rgba(248, 81, 73, 0.4)';
+            removeBtn.onclick = () => {
+                row.remove();
+                checkSplitLimit();
+            };
+
+            row.appendChild(input);
+            row.appendChild(removeBtn);
+            container.appendChild(row);
+        });
+        checkSplitLimit();
+    }
+
+    function checkSplitLimit() {
+        const container = document.getElementById('split-editor-container');
+        const addBtn = document.getElementById('add-split-day-btn');
+        if (container.children.length >= 7) {
+            addBtn.disabled = true;
+            addBtn.innerText = "Max 7 Days Reached";
+        } else {
+            addBtn.disabled = false;
+            addBtn.innerText = "+ Add Day";
+        }
+    }
+
+    // Event Listeners for Split/Sport
+    const profileSport = document.getElementById('profile-sport');
+    const gymOptions = document.getElementById('gym-options');
+
+    if (profileSport) {
+        profileSport.addEventListener('change', () => {
+            if (profileSport.value === 'Gym') {
+                gymOptions.style.display = 'block';
+            } else {
+                gymOptions.style.display = 'none';
+            }
+        });
+    }
+
+    const profileSplitTemplate = document.getElementById('profile-split-template');
+    if (profileSplitTemplate) {
+        profileSplitTemplate.addEventListener('change', () => {
+            const template = profileSplitTemplate.value;
+            if (splitTemplates[template]) {
+                const days = splitTemplates[template].slice(0, 7); // Ensure template respects limit
+                renderSplitEditor(days);
+            }
+        });
+    }
+
+    const addSplitDayBtn = document.getElementById('add-split-day-btn');
+    if (addSplitDayBtn) {
+        addSplitDayBtn.addEventListener('click', () => {
+            const container = document.getElementById('split-editor-container');
+            if (container.children.length >= 7) return;
+
+            const count = container.children.length + 1;
+
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = `Day ${count}`;
+            input.className = 'split-day-input';
+            input.style.flex = '1';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.innerText = '×';
+            removeBtn.className = 'secondary-btn';
+            removeBtn.style.padding = '4px 8px';
+            removeBtn.style.color = '#f85149';
+            removeBtn.style.borderColor = 'rgba(248, 81, 73, 0.4)';
+            removeBtn.onclick = () => {
+                row.remove();
+                checkSplitLimit();
+            };
+
+            row.appendChild(input);
+            row.appendChild(removeBtn);
+            container.appendChild(row);
+            checkSplitLimit();
+        });
+    }
+
+    // Initialize Split Editor with default
+    if (document.getElementById('split-editor-container')) {
+        renderSplitEditor(splitTemplates['PPL']);
+    }
+
+    // Auto-Calculate Typical Calories (Mifflin-St Jeor)
+    function estimateCalories() {
+        const gender = document.getElementById('profile-gender').value;
+        const weight = parseFloat(document.getElementById('profile-weight').value);
+        const height = parseInt(document.getElementById('profile-height').value);
+        const dobStr = document.getElementById('profile-dob').value;
+        const caloriesInput = document.getElementById('profile-calories');
+
+        if (weight && height && dobStr) {
+            const dob = new Date(dobStr);
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const m = today.getMonth() - dob.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                age--;
+            }
+
+            let bmr;
+            if (gender === 'Male') {
+                bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+            } else {
+                bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+            }
+
+            // Assume Sedentary/Light Active for "Typical" baseline if unknown, 
+            // or use the days to estimate TDEE
+            const days = parseInt(document.getElementById('profile-days').value) || 3;
+            let multiplier = 1.2;
+            if (days >= 3) multiplier = 1.375;
+            if (days >= 5) multiplier = 1.55;
+
+            const measuredTDEE = Math.round(bmr * multiplier);
+            caloriesInput.value = measuredTDEE;
+        }
+    }
+
+    // Listeners for Auto-Calc
+    ['profile-gender', 'profile-weight', 'profile-height', 'profile-dob', 'profile-days'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', estimateCalories);
+    });
+
+    wizardNextBtn.addEventListener('click', () => {
+        // Validate Step
+        const stepEl = document.querySelector(`.wizard-step[data-step="${currentStep}"]`);
+        const inputs = stepEl.querySelectorAll('input, select');
+        let valid = true;
+        inputs.forEach(input => {
+            if (input.hasAttribute('required') && !input.value) {
+                valid = false;
+                input.style.borderColor = '#f85149';
+            } else {
+                input.style.borderColor = '';
+            }
+        });
+
+        if (!valid) return;
+
+        // Validation per step
+        if (currentStep === 2) {
+            const dobStr = document.getElementById('profile-dob').value;
+            const height = parseFloat(document.getElementById('profile-height').value);
+            const weight = parseFloat(document.getElementById('profile-weight').value);
+
+            if (dobStr) {
+                const dob = new Date(dobStr);
+                const today = new Date();
+                if (dob >= today) {
+                    alert("Date of birth cannot be in the future.");
+                    return;
+                }
+                const age = today.getFullYear() - dob.getFullYear();
+                if (age < 10 || age > 120) {
+                    alert("Please enter a valid date of birth (Age 10-120).");
+                    return;
+                }
+            }
+            if (height && (height < 50 || height > 300)) {
+                alert("Please enter a valid height in cm (50-300).");
+                return;
+            }
+            if (weight && (weight < 20 || weight > 500)) {
+                alert("Please enter a valid weight in kg (20-500).");
+                return;
+            }
+        }
+
+        if (currentStep === 3) {
+            const goal = document.getElementById('profile-goal').value;
+            const targetWeight = parseFloat(document.getElementById('profile-target-weight').value);
+            const currentWeight = parseFloat(document.getElementById('profile-weight').value);
+
+            if (goal === 'Lose Weight' && targetWeight && currentWeight) {
+                if (targetWeight >= currentWeight) {
+                    alert("For 'Lose Weight', your target must be lower than your current weight.");
+                    return;
+                }
+            }
+            if (goal === 'Build Muscle' && targetWeight && currentWeight) {
+                if (targetWeight <= currentWeight) {
+                    alert("For 'Build Muscle', your target must be higher than your current weight.");
+                    return;
+                }
+            }
+        }
+
+        if (currentStep === 5) {
+            const sport = document.getElementById('profile-sport').value;
+            if (sport === 'Gym') {
+                const targetDays = parseInt(document.getElementById('profile-days').value) || 0;
+                // Only validate if we have input fields (some sports might not)
+                const inputs = document.querySelectorAll('.split-day-input');
+                if (inputs.length > 0) {
+                    let workoutCount = 0;
+                    inputs.forEach(input => {
+                        const dayName = input.value.trim().toLowerCase();
+                        if (dayName && dayName !== 'rest' && dayName !== 'rest day') {
+                            workoutCount++;
+                        }
+                    });
+
+                    if (workoutCount !== targetDays) {
+                        alert(`You selected ${targetDays} workout days per week, but your schedule defines ${workoutCount} workouts.\n\nPlease ensure you have exactly ${targetDays} workout days defined (mark others as "Rest").`);
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (currentStep < totalSteps) {
+            currentStep++;
+            showStep(currentStep);
+            // Trigger calc if moving to step 6
+            if (currentStep === 6) estimateCalories();
+        }
+    });
+
+    wizardBackBtn.addEventListener('click', () => {
+        if (currentStep > 1) {
+            currentStep--;
+            showStep(currentStep);
+        }
+    });
+
+    onboardingForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // Final Validation (Step 6)
+        const calories = parseInt(document.getElementById('profile-calories').value);
+        if (calories && (calories < 500 || calories > 10000)) {
+            alert("Please enter a realistic daily calorie estimate (500 - 10,000).");
+            return;
+        }
+
+        const userId = window.app.userId;
+        if (!userId) return;
+
+        // Collect Split Data
+        const splitInputs = document.querySelectorAll('.split-day-input');
+        const splitSchedule = Array.from(splitInputs).map(input => input.value).filter(val => val.trim() !== "");
+
+        const formData = {
+            user_id: userId,
+            name: document.getElementById('profile-name').value,
+            gender: document.getElementById('profile-gender').value,
+            dob: document.getElementById('profile-dob').value,
+            height_cm: parseInt(document.getElementById('profile-height').value),
+            weight_kg: parseFloat(document.getElementById('profile-weight').value),
+            target_weight_kg: parseInt(document.getElementById('profile-target-weight').value) || null,
+            fitness_goal: document.getElementById('profile-goal').value,
+            experience_level: document.getElementById('profile-experience').value,
+            workout_days_per_week: parseInt(document.getElementById('profile-days').value),
+
+            // New Fields
+            sport_type: document.getElementById('profile-sport').value,
+            equipment_access: document.getElementById('profile-equipment').value, // Might be hidden but value remains
+            split_schedule: splitSchedule,
+
+            typical_diet_type: document.getElementById('profile-diet-type').value,
+            typical_daily_calories: parseInt(document.getElementById('profile-calories').value),
+            allergies: document.getElementById('profile-allergies').value || "None"
+        };
+
+        // If not Gym, wipe split schedule? Or keep as generic?
+        if (formData.sport_type !== 'Gym') {
+            formData.split_schedule = [];
+            // Maybe set equipment to 'None' or keep user selection?
+            // User requested "equipment is significant only in gym sports". 
+            // So we can clear it or set based on logic. Let's keep it simple.
+        }
+
+        try {
+            wizardSubmitBtn.innerText = "Saving...";
+            const response = await fetch('/api/profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (!response.ok) throw new Error("Failed to save profile");
+
+            const resData = await response.json();
+
+            // Success
+            onboardingOverlay.classList.add('hidden');
+
+            let msg = `Profile saved! Welcome, ${formData.name}.`;
+            if (resData.targets) {
+                msg += `\nCalorie Target: ${resData.targets.daily_calorie_target} kcal`;
+            }
+            alert(msg);
+
+        } catch (error) {
+            console.error("Profile Save Error:", error);
+            alert("Error saving profile: " + error.message);
+            wizardSubmitBtn.innerText = "Finish";
+        }
+    });
+
+    async function checkProfile(userId) {
+        try {
+            const res = await fetch(`/api/profile/${userId}`);
+            const profile = await res.json();
+
+            // If empty or missing name, show onboarding
+            if (!profile || !profile.name) {
+                console.log("Profile incomplete, showing onboarding.");
+                onboardingOverlay.classList.remove('hidden');
+                currentStep = 1;
+                showStep(1);
+                // Init split editor
+                renderSplitEditor(splitTemplates['PPL']);
+            } else {
+                console.log("Profile found:", profile.name);
+                // Update Header
+                const headerUsername = document.getElementById('header-username');
+                const profileSection = document.getElementById('profile-section');
+                if (headerUsername && profileSection) {
+                    headerUsername.innerText = profile.name;
+                    profileSection.classList.remove('hidden');
+                    profileSection.style.display = 'flex';
+                }
+            }
+        } catch (e) {
+            console.error("Error checking profile:", e);
+        }
+    }
+
+    // Settings Button Logic
+    const settingsBtn = document.getElementById('settings-btn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', async () => {
+            const userId = window.app.userId;
+            if (!userId) return;
+
+            try {
+                // Fetch current data
+                const res = await fetch(`/api/profile/${userId}`);
+                const profile = await res.json();
+
+                if (profile) {
+                    // Populate Form
+                    document.getElementById('profile-name').value = profile.name || "";
+                    document.getElementById('profile-gender').value = profile.gender || "Male";
+                    document.getElementById('profile-dob').value = profile.dob || "";
+                    document.getElementById('profile-height').value = profile.height_cm || "";
+                    document.getElementById('profile-weight').value = profile.weight_kg || ""; // Note: this might be old weight, but ok for profile edit
+                    document.getElementById('profile-target-weight').value = profile.target_weight_kg || "";
+                    document.getElementById('profile-goal').value = profile.fitness_goal || "Maintain";
+                    document.getElementById('profile-experience').value = profile.experience_level || "Beginner";
+                    document.getElementById('profile-days').value = profile.workout_days_per_week || 3;
+
+                    document.getElementById('profile-sport').value = profile.sport_type || "Gym";
+                    // Trigger change to show/hide options
+                    profileSport.dispatchEvent(new Event('change'));
+
+                    if (profile.sport_type === 'Gym') {
+                        document.getElementById('profile-equipment').value = profile.equipment_access || "Gym";
+                        // Pre-fill Split Editor
+                        if (profile.split_schedule && profile.split_schedule.length > 0) {
+                            document.getElementById('profile-split-template').value = "Custom";
+                            renderSplitEditor(profile.split_schedule);
+                        } else {
+                            renderSplitEditor(splitTemplates['PPL']);
+                        }
+                    }
+
+                    document.getElementById('profile-diet-type').value = profile.typical_diet_type || "Balanced";
+                    document.getElementById('profile-calories').value = profile.typical_daily_calories || "";
+                    document.getElementById('profile-allergies').value = profile.allergies || "";
+
+                    // Show Wizard
+                    document.getElementById('wizard-title').innerText = "Update Profile";
+                    onboardingOverlay.classList.remove('hidden');
+                    currentStep = 1;
+                    showStep(1);
+                }
+            } catch (e) {
+                console.error("Error fetching profile for edit:", e);
+            }
+        });
+    }
+
+    // Auth State Listener
+    sbClient.auth.onAuthStateChange((event, session) => {
+        console.log("Auth Event:", event);
+
+        if (session) {
+            // User is signed in
+            authOverlay.classList.add('hidden');
+            window.app.setUserId(session.user.id);
+            localStorage.setItem('nutrisync_user_id', session.user.id);
+
+            // Load history for this user
+            window.app.loadHistory();
+            logoutBtn.style.display = "flex";
+
+            // Check Profile for Onboarding
+            checkProfile(session.user.id);
+        } else {
+            // User is signed out
+            authOverlay.classList.remove('hidden');
+            window.app.setUserId(null);
+            window.app.clearChat();
+            logoutBtn.style.display = "none";
+            // Also hide onboarding if user logs out mid-wizard
+            onboardingOverlay.classList.add('hidden');
+        }
+    });
 });

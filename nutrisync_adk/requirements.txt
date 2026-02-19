@@ -7,3 +7,6 @@ uvicorn
 pydantic
 pytz
 httpx
+jinja2
+pytest
+pytest-asyncio

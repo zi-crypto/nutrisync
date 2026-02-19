@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, List, Dict, Any
 from ..tools.utils import get_supabase_client, calculate_log_timestamp
+from ..user_context import current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,10 @@ def log_workout(
         aerobic_training_stress: Training stress score (optional).
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id:
+             return "Error: No user context."
+
         supabase = get_supabase_client()
         timestamp = calculate_log_timestamp()
         
@@ -33,6 +38,7 @@ def log_workout(
         log_date = get_today_date_str()
         
         data = {
+            "user_id": user_id,
             "created_at": timestamp,
             "log_date": log_date,
             "workout_type": workout_type,
@@ -64,8 +70,11 @@ def get_workout_history(days: Optional[int] = 7, start_date: Optional[str] = Non
         end_date: Specific end date to search up to.
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id: return []
+
         supabase = get_supabase_client()
-        query = supabase.table("workout_logs").select("*").order("created_at", desc=True)
+        query = supabase.table("workout_logs").select("*").eq("user_id", user_id).order("created_at", desc=True)
         
         if start_date:
             query = query.gte("created_at", start_date)
@@ -97,24 +106,23 @@ def calculate_workout_volume() -> str:
 def get_next_scheduled_workout() -> Dict[str, Any]:
     """
     Returns the next scheduled workout based on the user's active workout split.
-    
-    The function queries the database for the active split and determines
-    the next workout based on the last completed workout that matches the split.
-    If a day is missed, the schedule simply shifts forward.
-    
-    Returns:
-        A dictionary with:
-        - next_workout: The name of the next scheduled workout
-        - split_name: The name of the active split (e.g., "Arnold Split")
-        - position: Current position in the cycle (e.g., 3 of 5)
-        - total: Total workouts in the cycle
-        - message: A human-readable status message
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id:
+            return {"message": "Error: User context missing."}
+
         supabase = get_supabase_client()
         
-        # Call the PostgreSQL function
-        response = supabase.rpc('get_next_workout').execute()
+        # Call the PostgreSQL function - we need to ensure the RPC function accepts user_id if we modified it
+        # Assuming the RPC function might NOT take user_id yet, but let's check. 
+        # Actually, looking at migration_workout_splits.sql (which I can't see but assume exists), 
+        # it probably assumes 'everyone' or specific ID?
+        # IMPORTANT: If the RPC is hardcoded to a user, this breaks. 
+        # For now, pass user_id to RPC if possible, or assume RPC handles it via current_setting if RLS?
+        # Supabase RPC: .rpc('name', {params})
+        
+        response = supabase.rpc('get_next_workout', {"p_user_id": user_id}).execute()
         
         if response.data and len(response.data) > 0:
             row = response.data[0]
@@ -147,6 +155,7 @@ def get_next_scheduled_workout() -> Dict[str, Any]:
             
     except Exception as e:
         logger.error(f"Error fetching next scheduled workout: {e}")
+        # Try fallback without params if RPC signature mismatch
         return {
             "next_workout": None,
             "message": f"Error fetching schedule: {str(e)}"

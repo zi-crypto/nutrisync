@@ -3,6 +3,7 @@ import uuid
 from typing import Optional, List, Dict, Any
 from google.adk.tools import BaseTool
 from ..tools.utils import get_supabase_client, calculate_log_timestamp, get_today_date_str
+from ..user_context import current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,10 @@ def log_sleep(
         Status message string.
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id:
+             return "Error: No user context."
+
         supabase = get_supabase_client()
         # "Created At" is the time of logging (now)
         created_at = calculate_log_timestamp()
@@ -71,6 +76,7 @@ def log_sleep(
 
         data = {
             "id": record_id,
+            "user_id": user_id,
             "created_at": created_at,
             "sleep_date": sleep_date,
             "night_sleep_hours": night_sleep_hours,
@@ -106,8 +112,11 @@ def get_sleep_history(days: Optional[int] = 7, start_date: Optional[str] = None,
         end_date: Specific end date.
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id: return []
+
         supabase = get_supabase_client()
-        query = supabase.table("sleep_logs").select("*").order("sleep_date", desc=True)
+        query = supabase.table("sleep_logs").select("*").eq("user_id", user_id).order("sleep_date", desc=True)
         
         if start_date:
             query = query.gte("sleep_date", start_date)

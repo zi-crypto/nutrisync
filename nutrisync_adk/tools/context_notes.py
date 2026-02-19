@@ -3,6 +3,7 @@ import uuid
 from typing import Optional, List, Dict, Any
 from google.adk.tools import BaseTool
 from ..tools.utils import get_supabase_client, calculate_log_timestamp
+from ..user_context import current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +20,13 @@ def set_status_note(
         confirmation_required: Signal for confirmation.
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id: return "Error: No user context."
+
         supabase = get_supabase_client()
         
         data = {
+            "user_id": user_id,
             "note_content": note_content,
             "is_active": True
         }
@@ -52,20 +57,19 @@ def clear_status_note(
         clear_all: If True, clears ALL active notes.
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id: return "Error: No user context."
+
         supabase = get_supabase_client()
         
+        query = supabase.table("persistent_context").update({"is_active": False}).eq("user_id", user_id)
+        
         if clear_all:
-             response = supabase.table("persistent_context") \
-                .update({"is_active": False}) \
-                .eq("is_active", True) \
-                .execute()
+             response = query.eq("is_active", True).execute()
              return "Successfully cleared all active status notes."
         
         if note_id:
-            response = supabase.table("persistent_context") \
-                .update({"is_active": False}) \
-                .eq("id", note_id) \
-                .execute()
+            response = query.eq("id", note_id).execute()
             return f"Successfully cleared note {note_id}."
             
         return "Error: Must specify note_id or clear_all=True."
@@ -80,9 +84,13 @@ def get_active_notes_tool() -> List[Dict[str, Any]]:
     (Mostly for internal use or debugging, the ContextManager does this automatically).
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id: return []
+
         supabase = get_supabase_client()
         response = supabase.table("persistent_context") \
             .select("*") \
+            .eq("user_id", user_id) \
             .eq("is_active", True) \
             .order("created_at", desc=True) \
             .execute()

@@ -2,6 +2,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from google.adk.tools import BaseTool
 from ..tools.utils import get_supabase_client, calculate_log_timestamp, get_today_date_str
+from ..user_context import current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,15 @@ def log_meal(
     # For now, we'll assume the Agent has asked the user "Want to log X?", user says "Yes", then Agent calls this.
     
     try:
+        user_id = current_user_id.get()
+        if not user_id:
+             return "Error: No user context found."
+
         supabase = get_supabase_client()
         timestamp = calculate_log_timestamp()
         
         data = {
+            "user_id": user_id,
             "created_at": timestamp,
             "food_item": food_item,
             "calories": calories,
@@ -75,9 +81,13 @@ def get_nutrition_history(days: Optional[int] = 7, start_date: Optional[str] = N
         end_date: Specific end date (YYYY-MM-DD or ISO) to search up to. Useful for specific day queries.
     """
     try:
+        user_id = current_user_id.get()
+        if not user_id:
+             return []
+
         supabase = get_supabase_client()
         
-        query = supabase.table("nutrition_logs").select("*").order("created_at", desc=True)
+        query = supabase.table("nutrition_logs").select("*").eq("user_id", user_id).order("created_at", desc=True)
         
         if start_date:
             # Explicit start date provided

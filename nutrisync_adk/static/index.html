@@ -9,6 +9,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <!-- Markdown Parser -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- CSS -->
@@ -20,6 +24,21 @@
         <header>
             <div class="logo">NutriSync</div>
             <div class="status">Online</div>
+            <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
+                <div id="profile-section" class="profile-section hidden"
+                    style="display: flex; align-items: center; gap: 10px;">
+                    <span id="header-username" style="font-weight: 500;">User</span>
+                    <button id="settings-btn" class="icon-btn" title="Edit Profile">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </header>
 
         <div id="chat-history" class="chat-history">
@@ -55,6 +74,192 @@
             </button>
         </div>
     </div>
+
+    <!-- Auth Overlay -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-box">
+            <h2 id="auth-title">Welcome to NutriSync</h2>
+            <p id="auth-subtitle">Sign in to continue</p>
+
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" id="auth-submit-btn">Sign In</button>
+            </form>
+
+            <div class="auth-footer">
+                <span id="auth-toggle-text">Don't have an account?</span>
+                <button id="auth-toggle-btn">Sign Up</button>
+            </div>
+            <div id="auth-message" class="auth-message"></div>
+        </div>
+    </div>
+
+    <!-- Onboarding Wizard -->
+    <div id="onboarding-overlay" class="auth-overlay hidden">
+        <div class="auth-box wizard-box">
+            <h2 id="wizard-title">Let's get to know you</h2>
+            <p id="wizard-subtitle">Step 1 of 4</p>
+
+            <form id="onboarding-form">
+                <!-- Step 1: Basics -->
+                <div class="wizard-step" data-step="1">
+                    <div class="form-group">
+                        <label for="profile-name">What should we call you?</label>
+                        <input type="text" id="profile-name" placeholder="Your Name" required>
+                    </div>
+                </div>
+
+                <!-- Step 2: Body Stats -->
+                <div class="wizard-step hidden" data-step="2">
+                    <div class="form-group">
+                        <label for="profile-gender">Gender</label>
+                        <select id="profile-gender" class="form-select">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-dob">Date of Birth</label>
+                        <input type="date" id="profile-dob" required>
+                    </div>
+                    <div class="form-group-row">
+                        <div class="form-group">
+                            <label for="profile-height">Height (cm)</label>
+                            <input type="number" id="profile-height" placeholder="175" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-weight">Weight (kg)</label>
+                            <input type="number" id="profile-weight" placeholder="70" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Goals -->
+                <div class="wizard-step hidden" data-step="3">
+                    <div class="form-group">
+                        <label for="profile-goal">Fitness Goal</label>
+                        <select id="profile-goal" class="form-select">
+                            <option value="Lose Weight">Lose Weight</option>
+                            <option value="Build Muscle">Build Muscle</option>
+                            <option value="Maintain">Maintain</option>
+                            <option value="Improve Endurance">Improve Endurance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-target-weight">Target Weight (kg)</label>
+                        <input type="number" id="profile-target-weight" placeholder="70">
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-experience">Experience Level</label>
+                        <select id="profile-experience" class="form-select">
+                            <option value="Beginner">Beginner (0-1 years)</option>
+                            <option value="Intermediate">Intermediate (1-3 years)</option>
+                            <option value="Advanced">Advanced (3+ years)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Step 4: Logistics -->
+                <div class="wizard-step hidden" data-step="4">
+
+                    <div class="form-group">
+                        <label for="profile-days">Workout Days / Week</label>
+                        <input type="number" id="profile-days" min="1" max="7" value="3">
+                    </div>
+                </div>
+
+                <!-- Step 5: Sport & Activity -->
+                <div class="wizard-step hidden" data-step="5">
+                    <div class="form-group">
+                        <label for="profile-sport">Main Activity / Sport</label>
+                        <select id="profile-sport" class="form-select">
+                            <option value="Gym">Gym / Bodybuilding</option>
+                            <option value="Running">Running</option>
+                            <option value="Swimming">Swimming</option>
+                            <option value="Cycling">Cycling</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Gym-Specific: Split Editor -->
+                    <div id="gym-options">
+                        <div class="form-group">
+                            <label for="profile-split-template">Workout Split Template</label>
+                            <select id="profile-split-template" class="form-select">
+                                <option value="PPL">Push / Pull / Legs</option>
+                                <option value="Bro Split">Bro Split (Body Parts)</option>
+                                <option value="Upper Lower">Upper / Lower</option>
+                                <option value="Full Body">Full Body</option>
+                                <option value="Custom">Custom</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Customize Your Schedule:</label>
+                            <div id="split-editor-container"
+                                style="display: grid; grid-template-rows: repeat(4, auto); grid-auto-flow: column; gap: 10px; margin-top: 8px;">
+                                <!-- Dynamic Inputs will be injected here -->
+                            </div>
+                            <button type="button" id="add-split-day-btn" class="secondary-btn"
+                                style="width: 100%; margin-top: 8px; font-size: 0.85rem; padding: 8px;">+ Add
+                                Day</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="profile-equipment">Equipment Access</label>
+                            <select id="profile-equipment" class="form-select">
+                                <option value="Gym">Full Gym</option>
+                                <option value="Home">Home (Dumbbells/Bands)</option>
+                                <option value="Bodyweight">Bodyweight Only</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 6: Nutrition -->
+                <div class="wizard-step hidden" data-step="6">
+                    <div class="form-group">
+                        <label for="profile-diet-type">Typical Diet Type</label>
+                        <select id="profile-diet-type" class="form-select">
+                            <option value="Balanced">Balanced / Standard</option>
+                            <option value="Low Carb">Low Carb</option>
+                            <option value="Keto">Keto</option>
+                            <option value="High Protein">High Protein</option>
+                            <option value="Vegan">Vegan</option>
+                            <option value="Vegetarian">Vegetarian</option>
+                            <option value="Paleo">Paleo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-calories">Typical Daily Calories (Estimate)</label>
+                        <input type="number" id="profile-calories" placeholder="e.g. 2000" required>
+                        <small style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">We'll estimate this based on
+                            your stats if unsure.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-allergies">Allergies / Intolerances</label>
+                        <input type="text" id="profile-allergies" placeholder="e.g. Peanuts, Gluten, Dairy (Optional)">
+                    </div>
+                </div>
+
+                <div class="wizard-footer">
+                    <button type="button" id="wizard-back-btn" class="secondary-btn hidden">Back</button>
+                    <button type="button" id="wizard-next-btn">Next</button>
+                    <button type="submit" id="wizard-submit-btn" class="hidden">Finish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="/static/script.js?v=2"></script>
 </body>
