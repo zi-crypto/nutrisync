@@ -38,11 +38,11 @@ class HistoryService:
             logger.error(f"Error fetching chat history: {e}")
             return []
 
-    async def add_message(self, user_id: str, role: str, content: str, tool_calls: Optional[Dict] = None, image_data: Optional[str] = None):
-        """Adds a message to history."""
-        await asyncio.to_thread(self._add_message_sync, user_id, role, content, tool_calls, image_data)
+    async def add_message(self, user_id: str, role: str, content: str, tool_calls: Optional[Dict] = None, image_data: Optional[str] = None) -> Optional[str]:
+        """Adds a message to history. Returns the inserted message's UUID."""
+        return await asyncio.to_thread(self._add_message_sync, user_id, role, content, tool_calls, image_data)
 
-    def _add_message_sync(self, user_id: str, role: str, content: str, tool_calls: Optional[Dict], image_data: Optional[str]):
+    def _add_message_sync(self, user_id: str, role: str, content: str, tool_calls: Optional[Dict], image_data: Optional[str]) -> Optional[str]:
         try:
             data = {
                 "user_id": user_id,
@@ -51,9 +51,13 @@ class HistoryService:
                 "tool_calls": tool_calls,
                 "image_data": image_data
             }
-            self.supabase.table("chat_history").insert(data).execute()
+            res = self.supabase.table("chat_history").insert(data).execute()
+            if res.data and len(res.data) > 0:
+                return res.data[0].get("id")
+            return None
         except Exception as e:
             logger.error(f"Error adding message to history: {e}")
+            return None
 
     # --- Generic Time Series Fetchers ---
 

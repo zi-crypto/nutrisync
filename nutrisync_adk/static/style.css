@@ -71,8 +71,10 @@ header {
 }
 
 .status {
-    margin-left: 20px;  /* Creates the gap between Logo and Online */
-    margin-right: 20px; /* Creates the gap between Online and Username */
+    margin-left: 20px;
+    /* Creates the gap between Logo and Online */
+    margin-right: 20px;
+    /* Creates the gap between Online and Username */
     font-size: 0.85rem;
     color: #3fb950;
     display: flex;
@@ -597,6 +599,243 @@ button:hover {
 #wizard-submit-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
+}
+
+/* Feedback System */
+.message.bot-message {
+    position: relative;
+}
+
+.feedback-trigger {
+    position: absolute;
+    bottom: -4px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(48, 54, 61, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #8b949e;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    padding: 0;
+    z-index: 5;
+}
+
+.message.bot-message:hover .feedback-trigger {
+    opacity: 1;
+}
+
+.feedback-trigger:hover {
+    opacity: 1 !important;
+    background: rgba(88, 166, 255, 0.15);
+    color: var(--accent-color);
+    border-color: rgba(88, 166, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.feedback-trigger.feedback-liked {
+    opacity: 1;
+    color: #3fb950;
+    background: rgba(63, 185, 80, 0.15);
+    border-color: rgba(63, 185, 80, 0.3);
+}
+
+.feedback-trigger.feedback-disliked {
+    opacity: 1;
+    color: #f85149;
+    background: rgba(248, 81, 73, 0.15);
+    border-color: rgba(248, 81, 73, 0.3);
+}
+
+/* Feedback Popup */
+.feedback-popup {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 280px;
+    background: rgba(22, 27, 34, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    z-index: 100;
+    animation: feedbackFadeIn 0.2s ease-out;
+}
+
+@keyframes feedbackFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.feedback-header {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #c9d1d9;
+    margin-bottom: 12px;
+    letter-spacing: 0.02em;
+}
+
+.feedback-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.feedback-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(48, 54, 61, 0.4);
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    width: auto;
+    height: auto;
+}
+
+.feedback-btn:hover {
+    background: rgba(48, 54, 61, 0.7);
+    color: #c9d1d9;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.feedback-btn-like.active,
+.feedback-btn-like:hover {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+    border-color: rgba(63, 185, 80, 0.4);
+}
+
+.feedback-btn-dislike.active,
+.feedback-btn-dislike:hover {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+    border-color: rgba(248, 81, 73, 0.4);
+}
+
+/* Comment Section */
+.feedback-comment-section {
+    margin-top: 12px;
+    animation: feedbackFadeIn 0.2s ease-out;
+}
+
+.feedback-textarea {
+    width: 100%;
+    min-height: 60px;
+    max-height: 120px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(48, 54, 61, 0.4);
+    color: #e6edf3;
+    font-family: var(--font-family);
+    font-size: 0.85rem;
+    resize: vertical;
+    outline: none;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.feedback-textarea:focus {
+    border-color: rgba(88, 166, 255, 0.4);
+    background: rgba(48, 54, 61, 0.6);
+}
+
+.feedback-textarea::placeholder {
+    color: #484f58;
+}
+
+.feedback-comment-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.feedback-char-count {
+    font-size: 0.75rem;
+    color: #484f58;
+    transition: color 0.2s;
+}
+
+.feedback-char-count.valid {
+    color: #3fb950;
+}
+
+.feedback-submit-btn {
+    padding: 6px 16px;
+    border-radius: 8px;
+    background: var(--user-msg-bg);
+    color: white;
+    border: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: auto;
+    height: auto;
+}
+
+.feedback-submit-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(31, 111, 235, 0.3);
+}
+
+.feedback-submit-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.feedback-error {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: #f85149;
+}
+
+/* Confirmation */
+.feedback-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    color: #3fb950;
+    font-size: 0.85rem;
+    font-weight: 500;
+    animation: feedbackFadeIn 0.3s ease-out;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+    .feedback-popup {
+        width: 240px;
+        right: -8px;
+        padding: 12px;
+    }
+
+    .feedback-trigger {
+        opacity: 0.7;
+    }
 }
 
 .hidden {

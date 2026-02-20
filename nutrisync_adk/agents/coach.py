@@ -1,5 +1,4 @@
 import logging
-import os
 from google.adk.agents import Agent
 from google.adk.tools import google_search
 from google.genai import types
@@ -10,26 +9,16 @@ from ..tools.body_comp import log_body_comp, get_body_comp_history
 from ..tools.context_notes import set_status_note, clear_status_note, get_active_notes_tool
 from ..tools.charts import draw_chart
 from ..tools.utils import get_health_scores
-# TODO: Add google search tool
 
 logger = logging.getLogger(__name__)
 
-def load_system_prompt() -> str:
-    # Load the system prompt from file
-    prompt_path = os.path.join(os.path.dirname(__file__), '..', 'prompts', 'system.md')
-    try:
-        with open(prompt_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    except Exception as e:
-        logger.error(f"Error loading system prompt: {e}")
-        return "You are a helpful NutriSync coach."
-
-# Define the agent with tools bound
+# Agent config — instruction is set by the runner's InstructionProvider callback.
+# This object serves as a static config holder for model, tools, and description.
 coach_agent = Agent(
     name="coach_agent",
-    model="gemini-flash-latest", 
+    model="gemini-flash-latest",
     generate_content_config={"temperature": 0.2},
-    instruction=load_system_prompt(), # Initial static prompt, will be overridden/appended dynamically in runner
+    instruction="You are a helpful NutriSync coach.",  # Placeholder — overridden by InstructionProvider in runner
     tools=[
         log_meal,
         get_nutrition_history,

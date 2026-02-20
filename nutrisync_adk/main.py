@@ -39,6 +39,12 @@ class ChatRequest(BaseModel):
     guest_id: str
     image: Optional[str] = None
 
+class FeedbackRequest(BaseModel):
+    message_id: int
+    guest_id: str
+    feedback_value: int
+    feedback_comment: str
+
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     image_bytes = None
@@ -68,6 +74,39 @@ async def get_history(guest_id: str, after: Optional[str] = None):
     # Fetch history
     history = await runner.history_service.get_recent_chat_history(guest_id, limit=50, after=after)
     return history
+
+@app.post("/api/chat/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    try:
+        if len(request.feedback_comment.strip()) < 10:
+            raise HTTPException(status_code=400, detail="Feedback comment must be at least 10 characters long.")
+        
+        if request.feedback_value not in (1, -1):
+            raise HTTPException(status_code=400, detail="Feedback value must be 1 (like) or -1 (dislike).")
+            
+        data = {
+            "message_id": request.message_id,
+            "user_id": request.guest_id,
+            "feedback_value": request.feedback_value,
+            "feedback_comment": request.feedback_comment
+        }
+        
+        # Upsert: On conflict with unique message_id, update the feedback fields
+        # Note: supabase-py doesn't have a direct upsert that maps exactly to ON CONFLICT UPDATE without specifying the conflict fields if not PK,
+        # but since message_id is the primary target of uniqueness for this, we can try insert/update logic
+        
+        # Check if exists
+        existing = runner.supabase.table("message_feedback").select("id").eq("message_id", request.message_id).execute()
+        
+        if existing.data and len(existing.data) > 0:
+            runner.supabase.table("message_feedback").update(data).eq("message_id", request.message_id).execute()
+        else:
+            runner.supabase.table("message_feedback").insert(data).execute()
+            
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error saving feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Profile API
 class ProfileRequest(BaseModel):

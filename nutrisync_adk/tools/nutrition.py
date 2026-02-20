@@ -78,50 +78,11 @@ def get_nutrition_history(days: Optional[int] = 7, start_date: Optional[str] = N
     Args:
         days: Number of days to look back from today (default 7).
         start_date: Specific start date (YYYY-MM-DD or ISO) to search from. Only one of 'days' or 'start_date' is needed.
-        end_date: Specific end date (YYYY-MM-DD or ISO) to search up to. Useful for specific day queries.
+        end_date: Specific end date (YYYY-MM-DD or ISO) to search up to.
     """
-    try:
-        user_id = current_user_id.get()
-        if not user_id:
-             return []
+    from ..tools.utils import query_user_logs
+    return query_user_logs("nutrition_logs", days=days, start_date=start_date, end_date=end_date)
 
-        supabase = get_supabase_client()
-        
-        query = supabase.table("nutrition_logs").select("*").eq("user_id", user_id).order("created_at", desc=True)
-        
-        if start_date:
-            # Explicit start date provided
-            query = query.gte("created_at", start_date)
-            
-            if end_date:
-                # Explicit end date provided (Range Query)
-                # If end_date is just YYYY-MM-DD, we likely want to include the whole day, 
-                # but 'lte' does literal comparison. 
-                # If the agent passes "2025-12-25", lte matches 00:00:00.
-                # Ideally, agent should pass "2025-12-25T23:59:59" OR we handle it.
-                # For simplicity, we assume strict ISO comparison or agent handles precision.
-                query = query.lte("created_at", end_date)
-            
-            # Increase limit for explicitly requested history or deep dives
-            query = query.limit(100)
-        else:
-            # Default to lookback days
-            if days:
-                from datetime import datetime, timedelta
-                # We need a proper datetime object, get_current_functional_time returns one
-                from ..tools.utils import get_current_functional_time
-                now = get_current_functional_time()
-                lookback_date = now - timedelta(days=days)
-                query = query.gte("created_at", lookback_date.isoformat())
-            
-            # Default safety limit
-            query = query.limit(50)
-            
-        response = query.execute()    
-        return response.data
-    except Exception as e:
-        logger.error(f"Error fetching nutrition history: {e}")
-        return []
 
 def calculate_macros(food_name: str) -> str:
     """

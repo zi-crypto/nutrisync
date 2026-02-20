@@ -111,31 +111,6 @@ def get_sleep_history(days: Optional[int] = 7, start_date: Optional[str] = None,
         start_date: Specific start date (YYYY-MM-DD).
         end_date: Specific end date.
     """
-    try:
-        user_id = current_user_id.get()
-        if not user_id: return []
+    from ..tools.utils import query_user_logs
+    return query_user_logs("sleep_logs", date_column="sleep_date", days=days, start_date=start_date, end_date=end_date, default_limit=20)
 
-        supabase = get_supabase_client()
-        query = supabase.table("sleep_logs").select("*").eq("user_id", user_id).order("sleep_date", desc=True)
-        
-        if start_date:
-            query = query.gte("sleep_date", start_date)
-            if end_date:
-                query = query.lte("sleep_date", end_date)
-            query = query.limit(100)
-        else:
-            if days:
-                from datetime import timedelta
-                from ..tools.utils import get_current_functional_time
-                # Sleep date is just a date string usually (YYYY-MM-DD)
-                # But calculating N days ago is safe
-                now = get_current_functional_time()
-                lookback_date = now - timedelta(days=days)
-                query = query.gte("sleep_date", lookback_date.strftime('%Y-%m-%d'))
-            query = query.limit(20)
-            
-        response = query.execute()
-        return response.data
-    except Exception as e:
-        logger.error(f"Error fetching sleep history: {e}")
-        return []

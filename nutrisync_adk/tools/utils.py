@@ -64,6 +64,68 @@ def get_today_date_str() -> str:
         return functional_now.strftime('%Y-%m-%d')
     return now.strftime('%Y-%m-%d')
 
+
+def query_user_logs(
+    table_name: str,
+    date_column: str = "created_at",
+    days: int = None,
+    start_date: str = None,
+    end_date: str = None,
+    default_limit: int = 50,
+    explicit_limit: int = 100,
+) -> list:
+    """
+    Shared helper for querying time-series log tables filtered by the current user.
+
+    Args:
+        table_name: Supabase table to query (e.g. "nutrition_logs").
+        date_column: Column used for date filtering/ordering (e.g. "created_at", "sleep_date").
+        days: Lookback window in days from today (default: 7 if neither days nor start_date given).
+        start_date: Explicit start date (YYYY-MM-DD or ISO).
+        end_date: Explicit end date (YYYY-MM-DD or ISO). Only used with start_date.
+        default_limit: Max rows when using the days-based lookback.
+        explicit_limit: Max rows when using explicit start_date range.
+
+    Returns:
+        List of row dicts, or empty list on error.
+    """
+    from ..user_context import current_user_id
+
+    user_id = current_user_id.get()
+    if not user_id:
+        return []
+
+    try:
+        supabase = get_supabase_client()
+        query = (
+            supabase.table(table_name)
+            .select("*")
+            .eq("user_id", user_id)
+            .order(date_column, desc=True)
+        )
+
+        if start_date:
+            query = query.gte(date_column, start_date)
+            if end_date:
+                query = query.lte(date_column, end_date)
+            query = query.limit(explicit_limit)
+        else:
+            lookback_days = days if days is not None else 7
+            now = get_current_functional_time()
+            lookback_date = now - timedelta(days=lookback_days)
+            # Use ISO for timestamp columns, date string for date columns
+            if date_column == "created_at":
+                query = query.gte(date_column, lookback_date.isoformat())
+            else:
+                query = query.gte(date_column, lookback_date.strftime('%Y-%m-%d'))
+            query = query.limit(default_limit)
+
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        logger.error(f"Error fetching {table_name}: {e}")
+        return []
+
 def get_health_scores(user_id: str = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", persist: bool = False) -> Dict[str, Any]:
     """
     Calls the Supabase Edge Function 'user-improvement-scorer' to get health scores.

@@ -69,32 +69,9 @@ def get_workout_history(days: Optional[int] = 7, start_date: Optional[str] = Non
         start_date: Specific start date (YYYY-MM-DD or ISO) to search from. Only one of 'days' or 'start_date' is needed.
         end_date: Specific end date to search up to.
     """
-    try:
-        user_id = current_user_id.get()
-        if not user_id: return []
+    from ..tools.utils import query_user_logs
+    return query_user_logs("workout_logs", days=days, start_date=start_date, end_date=end_date)
 
-        supabase = get_supabase_client()
-        query = supabase.table("workout_logs").select("*").eq("user_id", user_id).order("created_at", desc=True)
-        
-        if start_date:
-            query = query.gte("created_at", start_date)
-            if end_date:
-                query = query.lte("created_at", end_date)
-            query = query.limit(100)
-        else:
-            if days:
-                from datetime import timedelta
-                from ..tools.utils import get_current_functional_time
-                now = get_current_functional_time()
-                lookback_date = now - timedelta(days=days)
-                query = query.gte("created_at", lookback_date.isoformat())
-            query = query.limit(50)
-            
-        response = query.execute()
-        return response.data
-    except Exception as e:
-        logger.error(f"Error fetching workout history: {e}")
-        return []
 
 def calculate_workout_volume() -> str:
     """

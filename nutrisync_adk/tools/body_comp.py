@@ -66,29 +66,6 @@ def get_body_comp_history(limit: Optional[int] = 10, days: Optional[int] = None,
     """
     Fetches body composition logs.
     """
-    try:
-        user_id = current_user_id.get()
-        if not user_id: return []
+    from ..tools.utils import query_user_logs
+    return query_user_logs("body_composition_logs", days=days, start_date=start_date, end_date=end_date, default_limit=limit or 10)
 
-        supabase = get_supabase_client()
-        query = supabase.table("body_composition_logs").select("*").eq("user_id", user_id).order("created_at", desc=True)
-        
-        if start_date:
-            query = query.gte("created_at", start_date)
-            if end_date:
-                query = query.lte("created_at", end_date)
-            query = query.limit(100)
-        elif days:
-             from datetime import timedelta
-             from ..tools.utils import get_current_functional_time
-             now = get_current_functional_time()
-             lookback_date = now - timedelta(days=days)
-             query = query.gte("created_at", lookback_date.isoformat()).limit(100)
-        else:
-             query = query.limit(limit)
-            
-        response = query.execute()
-        return response.data
-    except Exception as e:
-        logger.error(f"Error fetching body comp history: {e}")
-        return []
