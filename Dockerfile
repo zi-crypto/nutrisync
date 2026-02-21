@@ -4,6 +4,9 @@ FROM python:3.11-slim
 # Set the working directory in the container
 WORKDIR /app
 
+# Set default timezone for tzlocal since slim images lack tzdata
+ENV TZ=Europe/Berlin
+
 # Copy the requirements file into the container at /app
 # Adjust path if requirements.txt is not at the root but inside nutrisync_adk
 COPY nutrisync_adk/requirements.txt /app/requirements.txt

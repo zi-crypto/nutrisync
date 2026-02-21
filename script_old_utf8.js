@@ -1,4 +1,4 @@
-// NutriSync Chat Application
+﻿// NutriSync Chat Application
 // Implements the Premium Glassmorphism UI logic and State Management
 
 class ChatCache {
@@ -91,13 +91,11 @@ class ChatApp {
         this.API_URL = "/api/chat";
         this.HISTORY_URL = "/api/history/";
         this.PROFILE_URL = "/api/profile/";
-        this.FEEDBACK_URL = "/api/chat/feedback";
 
         // State
         this.userId = null; // Will be set by Auth
         this.currentImageBase64 = null;
         this.isTyping = false;
-        this.activeFeedbackPopup = null; // Track open popup
 
         // DOM Elements
         this.chatHistory = document.getElementById('chat-history');
@@ -121,14 +119,6 @@ class ChatApp {
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.clearImageBtn.addEventListener('click', () => this.clearImage());
         this.userInput.addEventListener('input', (e) => this.autoResizeInput(e.target));
-
-        // Close feedback popup on outside click
-        document.addEventListener('click', (e) => {
-            if (this.activeFeedbackPopup && !e.target.closest('.feedback-popup') && !e.target.closest('.feedback-trigger')) {
-                this.activeFeedbackPopup.remove();
-                this.activeFeedbackPopup = null;
-            }
-        });
     }
 
     // Auth handled externally, this just sets ID
@@ -165,15 +155,10 @@ class ChatApp {
         this.isTyping = false;
     }
 
-    appendMessage(role, text, chartData = null, imageBase64 = null, messageId = null) {
+    appendMessage(role, text, chartData = null, imageBase64 = null) {
         const msgDiv = document.createElement('div');
         msgDiv.classList.add('message');
         msgDiv.classList.add(role === 'user' ? 'user-message' : 'bot-message');
-
-        // Store message ID for feedback
-        if (messageId) {
-            msgDiv.setAttribute('data-message-id', messageId);
-        }
 
         let contentHtml = "";
 
@@ -209,12 +194,10 @@ class ChatApp {
             console.warn("KaTeX rendering failed:", e);
         }
 
-        this.chatHistory.appendChild(msgDiv);
+        // Remove typing indicator if it exists (to insert before it? Or just remove it)
+        // Usually we hide indicator before appending.
 
-        // Add feedback trigger for bot messages with a message ID
-        if (role !== 'user' && messageId) {
-            this.createFeedbackTrigger(msgDiv, messageId);
-        }
+        this.chatHistory.appendChild(msgDiv);
 
         // Chart
         if (chartData && chartData.image_base64) {
@@ -283,7 +266,7 @@ class ChatApp {
             const data = await response.json();
 
             this.hideTypingIndicator();
-            this.appendMessage('model', data.text, data.chart, null, data.message_id);
+            this.appendMessage('model', data.text, data.chart);
 
         } catch (error) {
             console.error('Send Error:', error);
@@ -424,7 +407,7 @@ class ChatApp {
                 }
             }
 
-            this.appendMessage(msg.role, msg.content, chartData, userImageBase64, msg.id);
+            this.appendMessage(msg.role, msg.content, chartData, userImageBase64);
         });
     }
 
@@ -434,189 +417,6 @@ class ChatApp {
         welcome.className = 'message bot-message';
         welcome.innerText = "Hello! I'm your NutriSync coach. How can I help you today?";
         this.chatHistory.appendChild(welcome);
-    }
-
-    // --- Feedback System ---
-
-    createFeedbackTrigger(msgDiv, messageId) {
-        const trigger = document.createElement('button');
-        trigger.className = 'feedback-trigger';
-        trigger.setAttribute('data-message-id', messageId);
-        trigger.title = 'Give feedback';
-        trigger.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                <line x1="9" y1="10" x2="9" y2="10"></line>
-                <line x1="12" y1="10" x2="12" y2="10"></line>
-                <line x1="15" y1="10" x2="15" y2="10"></line>
-            </svg>
-        `;
-        trigger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.showFeedbackPopup(msgDiv, messageId);
-        });
-        msgDiv.appendChild(trigger);
-    }
-
-    showFeedbackPopup(msgDiv, messageId) {
-        // Close any existing popup
-        if (this.activeFeedbackPopup) {
-            this.activeFeedbackPopup.remove();
-            this.activeFeedbackPopup = null;
-        }
-
-        const popup = document.createElement('div');
-        popup.className = 'feedback-popup';
-        popup.setAttribute('data-message-id', messageId);
-
-        // Check existing feedback state from the trigger
-        const trigger = msgDiv.querySelector('.feedback-trigger');
-        const existingValue = trigger ? trigger.getAttribute('data-feedback-value') : null;
-
-        popup.innerHTML = `
-            <div class="feedback-header">Rate this response</div>
-            <div class="feedback-buttons">
-                <button class="feedback-btn feedback-btn-like ${existingValue === '1' ? 'active' : ''}" data-value="1" title="Like">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"></path>
-                        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-                    </svg>
-                    <span>Like</span>
-                </button>
-                <button class="feedback-btn feedback-btn-dislike ${existingValue === '-1' ? 'active' : ''}" data-value="-1" title="Dislike">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"></path>
-                        <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
-                    </svg>
-                    <span>Dislike</span>
-                </button>
-            </div>
-            <div class="feedback-comment-section" style="display: none;">
-                <textarea class="feedback-textarea" placeholder="Tell us what was helpful or what went wrong..." minlength="10"></textarea>
-                <div class="feedback-comment-footer">
-                    <span class="feedback-char-count">0 / 10 min</span>
-                    <button class="feedback-submit-btn" disabled>Submit</button>
-                </div>
-                <div class="feedback-error" style="display: none;"></div>
-            </div>
-            <div class="feedback-confirmation" style="display: none;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-                <span>Thanks for your feedback!</span>
-            </div>
-        `;
-
-        // Wire up like/dislike buttons
-        let selectedValue = existingValue ? parseInt(existingValue) : null;
-        const likeBtn = popup.querySelector('.feedback-btn-like');
-        const dislikeBtn = popup.querySelector('.feedback-btn-dislike');
-        const commentSection = popup.querySelector('.feedback-comment-section');
-        const textarea = popup.querySelector('.feedback-textarea');
-        const charCount = popup.querySelector('.feedback-char-count');
-        const submitBtn = popup.querySelector('.feedback-submit-btn');
-        const errorDiv = popup.querySelector('.feedback-error');
-
-        const selectFeedback = (value) => {
-            selectedValue = value;
-            likeBtn.classList.toggle('active', value === 1);
-            dislikeBtn.classList.toggle('active', value === -1);
-            commentSection.style.display = 'block';
-            textarea.focus();
-        };
-
-        likeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectFeedback(1);
-        });
-
-        dislikeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectFeedback(-1);
-        });
-
-        // If there was previous feedback, show comment section immediately
-        if (existingValue) {
-            commentSection.style.display = 'block';
-        }
-
-        // Character counter and validation
-        textarea.addEventListener('input', () => {
-            const len = textarea.value.trim().length;
-            charCount.textContent = `${len} / 10 min`;
-            submitBtn.disabled = len < 10;
-            if (len >= 10) {
-                charCount.classList.add('valid');
-            } else {
-                charCount.classList.remove('valid');
-            }
-            errorDiv.style.display = 'none';
-        });
-
-        // Submit
-        submitBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const comment = textarea.value.trim();
-            if (comment.length < 10) {
-                errorDiv.textContent = 'Please write at least 10 characters.';
-                errorDiv.style.display = 'block';
-                return;
-            }
-            if (!selectedValue) return;
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Sending...';
-
-            const success = await this.submitFeedback(messageId, selectedValue, comment);
-
-            if (success) {
-                // Show confirmation
-                popup.querySelector('.feedback-buttons').style.display = 'none';
-                commentSection.style.display = 'none';
-                popup.querySelector('.feedback-confirmation').style.display = 'flex';
-
-                // Update trigger icon color
-                if (trigger) {
-                    trigger.setAttribute('data-feedback-value', selectedValue.toString());
-                    trigger.classList.add(selectedValue === 1 ? 'feedback-liked' : 'feedback-disliked');
-                    trigger.classList.remove(selectedValue === 1 ? 'feedback-disliked' : 'feedback-liked');
-                }
-
-                // Auto-close after 1.5s
-                setTimeout(() => {
-                    popup.remove();
-                    this.activeFeedbackPopup = null;
-                }, 1500);
-            } else {
-                errorDiv.textContent = 'Failed to save feedback. Please try again.';
-                errorDiv.style.display = 'block';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit';
-            }
-        });
-
-        msgDiv.appendChild(popup);
-        this.activeFeedbackPopup = popup;
-    }
-
-    async submitFeedback(messageId, feedbackValue, feedbackComment) {
-        try {
-            const response = await fetch(this.FEEDBACK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message_id: messageId,
-                    guest_id: this.userId,
-                    feedback_value: feedbackValue,
-                    feedback_comment: feedbackComment
-                })
-            });
-            return response.ok;
-        } catch (error) {
-            console.error('Feedback Error:', error);
-            return false;
-        }
     }
 }
 
@@ -632,10 +432,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // Explicitly parse URL hash tokens on initial load (crucial for email redirects)
-    await sbClient.auth.getSession();
-
     window.app = new ChatApp();
 
     // DOM Elements - Auth & Wizard
@@ -791,7 +587,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.innerText = '×';
+            removeBtn.innerText = '├ù';
             removeBtn.className = 'secondary-btn';
             removeBtn.style.padding = '4px 8px';
             removeBtn.style.color = '#f85149';
@@ -866,7 +662,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.innerText = '×';
+            removeBtn.innerText = '├ù';
             removeBtn.className = 'secondary-btn';
             removeBtn.style.padding = '4px 8px';
             removeBtn.style.color = '#f85149';
@@ -1192,38 +988,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Auth State Listener
-    let lastUserId = null;
     sbClient.auth.onAuthStateChange((event, session) => {
         console.log("Auth Event:", event);
 
         if (session) {
-            // Only trigger full reload if the user actually changed or just initialized
-            if (lastUserId !== session.user.id) {
-                lastUserId = session.user.id;
+            // User is signed in
+            authOverlay.classList.add('hidden');
+            window.app.setUserId(session.user.id);
+            localStorage.setItem('nutrisync_user_id', session.user.id);
 
-                // User is signed in
-                authOverlay.classList.add('hidden');
-                window.app.setUserId(session.user.id);
-                localStorage.setItem('nutrisync_user_id', session.user.id);
+            // Load history for this user
+            window.app.loadHistory();
+            logoutBtn.style.display = "flex";
 
-                // Load history for this user
-                window.app.loadHistory();
-                logoutBtn.style.display = "flex";
-
-                // Check Profile for Onboarding
-                checkProfile(session.user.id);
-            }
+            // Check Profile for Onboarding
+            checkProfile(session.user.id);
         } else {
             // User is signed out
-            if (lastUserId !== null) {
-                lastUserId = null;
-                authOverlay.classList.remove('hidden');
-                window.app.setUserId(null);
-                window.app.clearChat();
-                logoutBtn.style.display = "none";
-                // Also hide onboarding if user logs out mid-wizard
-                onboardingOverlay.classList.add('hidden');
-            }
+            authOverlay.classList.remove('hidden');
+            window.app.setUserId(null);
+            window.app.clearChat();
+            logoutBtn.style.display = "none";
+            // Also hide onboarding if user logs out mid-wizard
+            onboardingOverlay.classList.add('hidden');
         }
     });
 });

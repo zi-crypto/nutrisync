@@ -105,7 +105,7 @@ class NutriSyncRunner:
         self.context_service = ContextService(self.supabase)
 
         # ADK DatabaseSessionService — persists sessions in Supabase PostgreSQL
-        self.session_service = DatabaseSessionService(db_url=_get_db_url())
+        self.session_service = _create_session_service()
 
         # Static Agent — instruction is an InstructionProvider callback,
         # so the Agent object is immutable config while instructions are
