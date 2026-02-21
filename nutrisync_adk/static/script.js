@@ -845,6 +845,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    const profileGoal = document.getElementById('profile-goal');
+    const targetWeightContainer = document.getElementById('target-weight-container');
+    if (profileGoal && targetWeightContainer) {
+        profileGoal.addEventListener('change', () => {
+            if (profileGoal.value === 'Maintain') {
+                targetWeightContainer.classList.add('hidden');
+            } else {
+                targetWeightContainer.classList.remove('hidden');
+            }
+        });
+    }
+
     const addSplitDayBtn = document.getElementById('add-split-day-btn');
     if (addSplitDayBtn) {
         addSplitDayBtn.addEventListener('click', () => {
@@ -977,8 +989,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (currentStep === 3) {
             const goal = document.getElementById('profile-goal').value;
-            const targetWeight = parseFloat(document.getElementById('profile-target-weight').value);
+            const targetWeightInput = document.getElementById('profile-target-weight');
+            const targetWeight = parseFloat(targetWeightInput.value);
             const currentWeight = parseFloat(document.getElementById('profile-weight').value);
+
+            // Require target weight for everything EXCEPT "Maintain"
+            if (goal !== 'Maintain' && targetWeightInput.hasAttribute('required') && !targetWeight) {
+                targetWeightInput.style.borderColor = '#f85149';
+                valid = false;
+                alert("Please enter a Target Weight for your goal.");
+                return;
+            }
 
             if (goal === 'Lose Weight' && targetWeight && currentWeight) {
                 if (targetWeight >= currentWeight) {

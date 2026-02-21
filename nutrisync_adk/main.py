@@ -249,6 +249,10 @@ async def update_profile(request: ProfileRequest):
         targets = calculate_targets(data) 
         data.update(targets)
 
+        # Force Target Weight to Current Weight if goal is Maintain
+        if data.get('fitness_goal') == 'Maintain' and current_weight is not None:
+            data['target_weight_kg'] = current_weight
+
         if res.data:
             # Update
             # Check if starting_weight_kg is set, if not and we have a weight, set it (for legacy)
