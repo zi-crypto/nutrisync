@@ -1,6 +1,17 @@
 // NutriSync Chat Application
 // Implements the Premium Glassmorphism UI logic and State Management
 
+// Configure marked.js to open links in a new tab
+if (typeof marked !== 'undefined') {
+    const renderer = new marked.Renderer();
+    const linkRenderer = renderer.link;
+    renderer.link = (href, title, text) => {
+        const html = linkRenderer.call(renderer, href, title, text);
+        return html.replace(/^<a /, '<a target="_blank" rel="noopener noreferrer" ');
+    };
+    marked.setOptions({ renderer: renderer });
+}
+
 class ChatCache {
     constructor(userId) {
         this.userId = userId;
