@@ -1077,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             dob: document.getElementById('profile-dob').value,
             height_cm: parseInt(document.getElementById('profile-height').value),
             weight_kg: parseFloat(document.getElementById('profile-weight').value),
-            target_weight_kg: parseInt(document.getElementById('profile-target-weight').value) || null,
+            target_weight_kg: parseFloat(document.getElementById('profile-target-weight').value) || null,
             fitness_goal: document.getElementById('profile-goal').value,
             experience_level: document.getElementById('profile-experience').value,
             workout_days_per_week: parseInt(document.getElementById('profile-days').value),

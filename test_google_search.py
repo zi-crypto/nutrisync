@@ -1,24 +1,19 @@
-import asyncio
-from google.adk.agents import Agent
-from google.adk.tools import google_search
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-async def test_search():
-    agent = Agent(
-        name="test_agent",
-        model="gemini-1.5-flash",
-        tools=[google_search]
-    )
+from nutrisync_adk.tools.web_search import web_search
+
+def test_tavily():
+    print("Testing Tavily Web Search...")
+    query = "is monk fruit keto friendly?"
+    print(f"\nQuery: {query}")
     
-    async for event in agent.run_async(new_message="Search google for the current weather in New York"):
-        if getattr(event, 'is_final_response', False):
-            print(event.content.parts[0].text)
-        elif getattr(event, 'content', None) and event.content.parts:
-            for part in event.content.parts:
-                print(part)
+    result = web_search(query)
+    print("\nResult:")
+    print("-" * 40)
+    print(result)
+    print("-" * 40)
 
 if __name__ == "__main__":
-    asyncio.run(test_search())
+    test_tavily()

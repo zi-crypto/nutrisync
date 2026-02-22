@@ -8,6 +8,7 @@ from ..tools.sleep import log_sleep, get_sleep_history
 from ..tools.body_comp import log_body_comp, get_body_comp_history
 from ..tools.context_notes import set_status_note, clear_status_note, get_active_notes_tool
 from ..tools.charts import draw_chart
+from ..tools.web_search import web_search
 from ..tools.utils import get_health_scores
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ coach_agent = Agent(
         clear_status_note,
         get_active_notes_tool,
         draw_chart,
-        # google_search,  # Built-in ADK tool for real-time search (Incompatible with tools in Gemini 1.5)
+        web_search,
     ],
-    description="Main coach agent handling nutrition, workout, sleep, body comp, and context notes logic."
+    description="Main coach agent handling nutrition, workout, sleep, body comp, context notes logic, and up-to-date internet searches."
 )

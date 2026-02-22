@@ -116,7 +116,7 @@ class ProfileRequest(BaseModel):
     dob: str
     height_cm: int
     weight_kg: float
-    target_weight_kg: Optional[int] = None
+    target_weight_kg: Optional[float] = None
     fitness_goal: str
     experience_level: str
     equipment_access: str
