@@ -11,3 +11,4 @@ jinja2
 pytest
 pytest-asyncio
 asyncpg
+tavily-python
