@@ -668,6 +668,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wizardTitle = document.getElementById('wizard-title');
     const wizardSubtitle = document.getElementById('wizard-subtitle');
 
+    // Live Coach Elements
+    const liveCoachToggleBtn = document.getElementById('live-coach-toggle-btn');
+    const liveCoachOverlay = document.getElementById('live-coach-overlay');
+    const closeCoachBtn = document.getElementById('close-coach-btn');
+    const startCoachBtn = document.getElementById('start-coach-btn');
+    const stopCoachBtn = document.getElementById('stop-coach-btn');
+    const coachVideo = document.getElementById('coach-video');
+    const coachCanvas = document.getElementById('coach-canvas');
+
     const logoutBtn = document.createElement('button'); // Create Logout Button
     logoutBtn.innerHTML = `
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -680,6 +689,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     logoutBtn.style.marginLeft = "auto";
     logoutBtn.addEventListener('click', handleLogout);
     document.querySelector('header').appendChild(logoutBtn);
+
+    // --- Live Coach Logic ---
+    let liveCoachSystem = null;
+
+    if (liveCoachToggleBtn) {
+        liveCoachToggleBtn.addEventListener('click', () => {
+            liveCoachOverlay.classList.remove('hidden');
+
+            // Initialize system if not already done
+            if (!liveCoachSystem && window.LiveCoachController) {
+                const cameraManager = new window.CameraManager(coachVideo, 640, 480);
+                const poseService = new window.PoseEstimationService();
+                const uiRenderer = new window.UIRenderer(coachCanvas);
+                const exerciseEngine = new window.ExerciseEngine();
+                liveCoachSystem = new window.LiveCoachController(cameraManager, poseService, uiRenderer, exerciseEngine);
+            }
+        });
+    }
+
+    if (closeCoachBtn) {
+        closeCoachBtn.addEventListener('click', () => {
+            if (liveCoachSystem) {
+                liveCoachSystem.stop();
+            }
+            startCoachBtn.classList.remove('hidden');
+            stopCoachBtn.classList.add('hidden');
+            liveCoachOverlay.classList.add('hidden');
+        });
+    }
+
+    if (startCoachBtn) {
+        startCoachBtn.addEventListener('click', () => {
+            if (liveCoachSystem) {
+                liveCoachSystem.start();
+                startCoachBtn.classList.add('hidden');
+                stopCoachBtn.classList.remove('hidden');
+            }
+        });
+    }
+
+    if (stopCoachBtn) {
+        stopCoachBtn.addEventListener('click', () => {
+            if (liveCoachSystem) {
+                liveCoachSystem.stop();
+                startCoachBtn.classList.remove('hidden');
+                stopCoachBtn.classList.add('hidden');
+            }
+        });
+    }
 
     // --- Auth Logic ---
     let isSignUp = false;
@@ -1241,6 +1299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Load history for this user
                 window.app.loadHistory();
                 logoutBtn.style.display = "flex";
+                if (liveCoachToggleBtn) liveCoachToggleBtn.classList.remove('hidden');
 
                 // Check Profile for Onboarding
                 checkProfile(session.user.id);
@@ -1253,6 +1312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.app.setUserId(null);
                 window.app.clearChat();
                 logoutBtn.style.display = "none";
+                if (liveCoachToggleBtn) liveCoachToggleBtn.classList.add('hidden');
                 // Also hide onboarding if user logs out mid-wizard
                 onboardingOverlay.classList.add('hidden');
             }

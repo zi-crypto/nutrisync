@@ -16,6 +16,14 @@
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="/static/workout_coach.js"></script>
     <!-- CSS -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -26,6 +34,13 @@
             <div class="logo">NutriSync</div>
             <div class="status">Online</div>
             <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
+                <button id="live-coach-toggle-btn" class="icon-btn hidden" title="Live Coach">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 7l-7 5 7 5V7z"></path>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                </button>
                 <div id="profile-section" class="profile-section hidden"
                     style="display: flex; align-items: center; gap: 10px;">
                     <span id="header-username" style="font-weight: 500;">User</span>
@@ -99,6 +114,32 @@
                 <button id="auth-toggle-btn">Sign Up</button>
             </div>
             <div id="auth-message" class="auth-message"></div>
+        </div>
+    </div>
+
+    <!-- Live Coach Overlay -->
+    <div id="live-coach-overlay" class="auth-overlay hidden">
+        <div class="auth-box wizard-box" style="width: 95%; max-width: 700px; padding: 20px;">
+            <button id="close-coach-btn" class="icon-btn" style="position: absolute; top: 15px; right: 15px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <h2 id="coach-title">NutriSync Live Coach</h2>
+            <p id="coach-subtitle">Ensure your full body is visible in the camera.</p>
+
+            <div class="coach-video-container"
+                style="position: relative; width: 100%; max-width: 640px; margin: 15px auto; border-radius: 8px; overflow: hidden; background: #000;">
+                <video id="coach-video" class="input_video" autoplay muted playsinline style="display: none;"></video>
+                <canvas id="coach-canvas" class="output_canvas" width="640" height="480"
+                    style="width: 100%; display: block;"></canvas>
+            </div>
+
+            <div class="wizard-footer" style="justify-content: center; margin-top: 20px;">
+                <button type="button" id="start-coach-btn">Start Tracking</button>
+                <button type="button" id="stop-coach-btn" class="secondary-btn hidden">Stop</button>
+            </div>
         </div>
     </div>
 
