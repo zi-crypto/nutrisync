@@ -676,6 +676,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const stopCoachBtn = document.getElementById('stop-coach-btn');
     const coachVideo = document.getElementById('coach-video');
     const coachCanvas = document.getElementById('coach-canvas');
+    const coachExerciseSelect = document.getElementById('coach-exercise-select');
 
     const logoutBtn = document.createElement('button'); // Create Logout Button
     logoutBtn.innerHTML = `
@@ -735,6 +736,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 liveCoachSystem.stop();
                 startCoachBtn.classList.remove('hidden');
                 stopCoachBtn.classList.add('hidden');
+            }
+        });
+    }
+
+    if (coachExerciseSelect) {
+        coachExerciseSelect.addEventListener('change', (e) => {
+            if (liveCoachSystem && liveCoachSystem.exerciseEngine) {
+                liveCoachSystem.exerciseEngine.setExercise(e.target.value);
             }
         });
     }

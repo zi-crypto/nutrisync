@@ -129,6 +129,15 @@
             <h2 id="coach-title">NutriSync Live Coach</h2>
             <p id="coach-subtitle">Ensure your full body is visible in the camera.</p>
 
+            <div style="text-align: center; margin-bottom: 10px;">
+                <label for="coach-exercise-select" style="margin-right: 10px; color: #E2E8F0;">Exercise:</label>
+                <select id="coach-exercise-select"
+                    style="padding: 6px 12px; border-radius: 6px; background-color: #2D3748; color: white; border: 1px solid #4A5568;">
+                    <option value="squat">Squats</option>
+                    <option value="pushup">Pushups</option>
+                </select>
+            </div>
+
             <div class="coach-video-container"
                 style="position: relative; width: 100%; max-width: 640px; margin: 15px auto; border-radius: 8px; overflow: hidden; background: #000;">
                 <video id="coach-video" class="input_video" autoplay muted playsinline style="display: none;"></video>

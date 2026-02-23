@@ -93,13 +93,36 @@ class SquatProfile {
 
         const angleKnee = MathUtils.calculateAngle(hip, knee, ankle);
 
+        // Exercise Cross-Contamination Filter: Prevent Pushups in Squat Mode
+        // 1. In a pushup, the body is stretched out horizontally on the floor.
+        //    Therefore, the horizontal distance (X-axis) between shoulders and ankles is large.
+        // 2. In a squat, the head is vertically aligned over the feet, so X-distance is small.
+        // We calculate horizontal distance as a percentage of the screen width (0 to 1).
+        const leftShoulder = landmarks[11], rightShoulder = landmarks[12];
+        const shoulder = useLeft ? leftShoulder : rightShoulder;
+        const horizontalDistance = Math.abs(shoulder.x - ankle.x);
+
+        // Also check if the torso is completely plank-straight to the floor (Shoulder-Hip-Ankle ~ 180)
+        const angleBack = MathUtils.calculateAngle(shoulder, hip, ankle);
+
+        // If body is stretched across screen (> 35% of width) OR back is perfectly straight while knee bends
+        if (horizontalDistance > 0.35 || angleBack > 165) {
+            return {
+                state: this.state, // Preserve state so it doesn't reset
+                reps: this.reps,
+                feedback: "Stand up to squat!",
+                angle: Math.round(angleKnee),
+                instruction: "Camera placement: Waist height, direct side view."
+            };
+        }
+
         // Form & State logic
         // 1. Fully Upright (Extend state reset deeper to ensure they lock out)
-        if (angleKnee > 155) {
+        if (angleKnee > 165) {
             if (this.state === 'ASCENDING' || this.state === 'DOWN') {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count
-            } else if (this.state === 'DESCENDING' && this.lastAngle > 110) {
+            } else if (this.state === 'DESCENDING' && this.lastAngle > 115) {
                 this.feedback = "Squat deeper next time.";
             } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
                 this.feedback = "Ready";
@@ -107,7 +130,7 @@ class SquatProfile {
             this.state = 'UP';
         }
         // 2. Mid descent/ascent
-        else if (angleKnee <= 155 && angleKnee > 125) {
+        else if (angleKnee <= 165 && angleKnee > 115) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
             } else if (this.state === 'DOWN') {
@@ -115,9 +138,8 @@ class SquatProfile {
             }
         }
         // 3. Deep Squat (Hitting depth)
-        // Adjust threshold from < 95 to <= 125. A solid parallel squat is often around 90-110,
-        // but 120 accommodates partial/stiffer squats and varying camera angles.
-        else if (angleKnee <= 125) {
+        // Adjust threshold from <= 115 to <= 115 to require a deep, parallel squat
+        else if (angleKnee <= 115) {
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN';
                 this.feedback = "Good depth, push up!";
@@ -130,19 +152,151 @@ class SquatProfile {
             state: this.state,
             reps: this.reps,
             feedback: this.feedback,
-            angle: Math.round(angleKnee)
+            angle: Math.round(angleKnee),
+            instruction: "Camera placement: Waist height, direct side view."
+        };
+    }
+}
+
+class PushupProfile {
+    constructor() {
+        this.state = 'UP';
+        this.reps = 0;
+        this.feedback = "Ready";
+        this.lastAngle = 180;
+    }
+
+    processConstraints(landmarks) {
+        // MediaPipe indices: Shoulder(11/12), Elbow(13/14), Wrist(15/16), Hip(23/24), Ankle(27/28)
+        const leftShoulder = landmarks[11], leftElbow = landmarks[13], leftWrist = landmarks[15];
+        const rightShoulder = landmarks[12], rightElbow = landmarks[14], rightWrist = landmarks[16];
+        const leftHip = landmarks[23], leftAnkle = landmarks[27];
+        const rightHip = landmarks[24], rightAnkle = landmarks[28];
+
+        // Use the side with better average visibility for arms
+        const leftVis = leftShoulder.visibility + leftElbow.visibility + leftWrist.visibility;
+        const rightVis = rightShoulder.visibility + rightElbow.visibility + rightWrist.visibility;
+        const useLeft = leftVis >= rightVis;
+
+        const shoulder = useLeft ? leftShoulder : rightShoulder;
+        const elbow = useLeft ? leftElbow : rightElbow;
+        const wrist = useLeft ? leftWrist : rightWrist;
+        const hip = useLeft ? leftHip : rightHip;
+        const ankle = useLeft ? leftAnkle : rightAnkle;
+
+        const angleElbow = MathUtils.calculateAngle(shoulder, elbow, wrist);
+        const angleBack = MathUtils.calculateAngle(shoulder, hip, ankle);
+
+        // Exercise Cross-Contamination Filter: Prevent Squats in Pushup Mode
+        // 1. In a pushup, the body is horizontal. 
+        // 2. In a squat, the body is vertical (Shoulder Y is massively above Ankle Y).
+        // 3. We check the vertical distance (Y-axis) between Shoulder and Ankle.
+        const verticalDistance = Math.abs(ankle.y - shoulder.y);
+
+        // If the vertical distance is massive (> 50% of the screen height), 
+        // the user is standing, not in a pushup position.
+        if (verticalDistance > 0.5) {
+            return {
+                state: this.state, // Preserve state
+                reps: this.reps,
+                feedback: "Get into a plank!",
+                angle: Math.round(angleElbow),
+                label: 'Elbow Angle',
+                instruction: "Camera placement: Floor level, 45-degree angle side view."
+            };
+        }
+
+        // Strict Form check: Back should be relatively straight (approx 180). 
+        // If it dips significantly below 130 (more forgiving for camera angles), trigger a form warning.
+        if (angleBack < 130 && this.state !== 'DOWN') {
+            this.feedback = "Keep back straight!";
+            // We can optionally return early or just let the feedback sit. Let's let it sit.
+        }
+
+        // Form & State logic (Elbow angle)
+        if (angleElbow > 165) {
+            if (this.state === 'ASCENDING' || this.state === 'DOWN') {
+                this.reps++;
+                this.feedback = `${this.reps}`; // Emits Rep count
+            } else if (this.state === 'DESCENDING' && this.lastAngle > 95) {
+                this.feedback = "Go lower!";
+            } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
+                this.feedback = "Ready";
+            }
+            this.state = 'UP';
+        }
+        else if (angleElbow <= 165 && angleElbow > 100) {
+            if (this.state === 'UP') {
+                this.state = 'DESCENDING';
+            } else if (this.state === 'DOWN') {
+                this.state = 'ASCENDING';
+            }
+        }
+        else if (angleElbow <= 100) {
+            if (this.state === 'DESCENDING') {
+                this.state = 'DOWN';
+                this.feedback = "Good depth, push up!";
+            }
+        }
+
+        this.lastAngle = angleElbow;
+
+        return {
+            state: this.state,
+            reps: this.reps,
+            feedback: this.feedback,
+            angle: Math.round(angleElbow),
+            label: 'Elbow Angle',
+            instruction: "Camera placement: Floor level, 45-degree angle side view."
         };
     }
 }
 
 class ExerciseEngine {
     constructor() {
-        this.currentProfile = new SquatProfile(); // Defaults to Squat for Phase 3
+        this.profiles = {
+            'squat': new SquatProfile(),
+            'pushup': new PushupProfile()
+        };
+        this.currentProfile = this.profiles['squat']; // Default
         this.latestResult = null;
+    }
+
+    setExercise(exerciseName) {
+        if (this.profiles[exerciseName]) {
+            this.currentProfile = this.profiles[exerciseName];
+            // Reset state
+            this.currentProfile.state = 'UP';
+            this.currentProfile.reps = 0;
+            this.currentProfile.feedback = "Ready";
+            this.latestResult = null;
+            return true;
+        }
+        return false;
     }
 
     update(landmarks) {
         if (!landmarks || landmarks.length < 33) return null;
+
+        // --- False Positive Filter ---
+        // MediaPipe tries to find humans in random objects (like tripods) if the threshold is low.
+        // We ensure that key anchor points (like the face or shoulders) are actually visible 
+        // with high confidence before we consider this a valid skeleton.
+        const noseVis = landmarks[0]?.visibility || 0;
+        const leftShoulderVis = landmarks[11]?.visibility || 0;
+        const rightShoulderVis = landmarks[12]?.visibility || 0;
+
+        // If neither the nose nor both shoulders are reasonably visible, we assume it's a false positive object
+        if (noseVis < 0.7 && (leftShoulderVis < 0.7 || rightShoulderVis < 0.7)) {
+            return {
+                state: this.currentProfile.state,
+                reps: this.currentProfile.reps,
+                feedback: "Ensure upper body is clearly visible.",
+                angle: 0,
+                instruction: this.currentProfile.instruction || ""
+            };
+        }
+
         this.latestResult = this.currentProfile.processConstraints(landmarks);
         return this.latestResult;
     }
@@ -227,8 +381,8 @@ class PoseEstimationService {
             smoothLandmarks: true,
             enableSegmentation: false,
             smoothSegmentation: false,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
         });
     }
 
@@ -334,7 +488,22 @@ class LiveCoachController {
                 this.uiRenderer.drawOverlayText(`Reps: ${engineStatus.reps}`, 20, 40, '30px', '#00FF00');
                 this.uiRenderer.drawOverlayText(`Stage: ${engineStatus.state}`, 20, 80, '24px', '#FFF');
                 this.uiRenderer.drawOverlayText(`Feedback: ${engineStatus.feedback}`, 20, 120, '20px', '#FFF');
-                this.uiRenderer.drawOverlayText(`Knee Angle: ${engineStatus.angle}`, 20, 460, '18px', '#FFF');
+
+                if (engineStatus.instruction) {
+                    // Render camera instruction centered at the bottom
+                    const instructionY = this.uiRenderer.canvasElement.height - 20;
+                    this.uiRenderer.ctx.font = '16px Arial';
+                    const textWidth = this.uiRenderer.ctx.measureText(engineStatus.instruction).width;
+                    const textX = (this.uiRenderer.canvasElement.width - textWidth) / 2;
+
+                    // Draw background box for readability
+                    this.uiRenderer.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    this.uiRenderer.ctx.fillRect(textX - 10, instructionY - 20, textWidth + 20, 26);
+                    this.uiRenderer.drawOverlayText(engineStatus.instruction, textX, instructionY, '16px', '#FFD700');
+                }
+
+                const angleLabel = engineStatus.label || 'Knee Angle';
+                this.uiRenderer.drawOverlayText(`${angleLabel}: ${engineStatus.angle}`, 20, 420, '18px', '#FFF');
 
                 // Trigger voice coaching
                 if (engineStatus.feedback !== "Ready" && engineStatus.feedback !== this.lastFeedback) {
