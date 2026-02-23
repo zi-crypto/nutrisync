@@ -218,21 +218,21 @@ class PushupProfile {
             if (this.state === 'ASCENDING' || this.state === 'DOWN') {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count
-            } else if (this.state === 'DESCENDING' && this.lastAngle > 95) {
+            } else if (this.state === 'DESCENDING' && this.lastAngle > 85) {
                 this.feedback = "Go lower!";
             } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
                 this.feedback = "Ready";
             }
             this.state = 'UP';
         }
-        else if (angleElbow <= 165 && angleElbow > 100) {
+        else if (angleElbow <= 165 && angleElbow > 85) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING';
             }
         }
-        else if (angleElbow <= 100) {
+        else if (angleElbow <= 85) {
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN';
                 this.feedback = "Good depth, push up!";
@@ -252,11 +252,91 @@ class PushupProfile {
     }
 }
 
+class PullProfile {
+    constructor() {
+        this.state = 'UP'; // 'UP' means arms are fully extended (bottom of pull-up, top of pull-down)
+        this.reps = 0;
+        this.feedback = "Ready";
+        this.lastAngle = 180;
+    }
+
+    processConstraints(landmarks) {
+        // MediaPipe indices: Nose(0), Shoulder(11/12), Elbow(13/14), Wrist(15/16), Hip(23/24)
+        const leftShoulder = landmarks[11], leftElbow = landmarks[13], leftWrist = landmarks[15], leftHip = landmarks[23];
+        const rightShoulder = landmarks[12], rightElbow = landmarks[14], rightWrist = landmarks[16], rightHip = landmarks[24];
+
+        const leftVis = leftShoulder.visibility + leftElbow.visibility + leftWrist.visibility;
+        const rightVis = rightShoulder.visibility + rightElbow.visibility + rightWrist.visibility;
+        const useLeft = leftVis >= rightVis;
+
+        const shoulder = useLeft ? leftShoulder : rightShoulder;
+        const elbow = useLeft ? leftElbow : rightElbow;
+        const wrist = useLeft ? leftWrist : rightWrist;
+        const hip = useLeft ? leftHip : rightHip;
+
+        const angleElbow = MathUtils.calculateAngle(shoulder, elbow, wrist);
+
+        // Exercise Cross-Contamination Filter: Prevent Squat/Pushup counting as Pull-up
+        // In a pulling motion, the hands (wrists) must start and generally remain above the shoulders.
+        // MediaPipe Y: 0 is top of screen, 1 is bottom. So wrist Y should be smaller than shoulder Y.
+        // We add a strict check that if wrists drop massively below shoulders, ignore.
+        if (wrist.y > shoulder.y + 0.1) {
+            return {
+                state: this.state,
+                reps: this.reps,
+                feedback: "Reach hands UP for pullups!",
+                angle: Math.round(angleElbow),
+                label: 'Elbow Angle',
+                instruction: "Camera placement: Camera higher up, capturing full arm extension."
+            };
+        }
+
+        // Form & State logic (Elbow angle)
+        // 'UP' state refers to arms extended (starting position).
+        if (angleElbow > 150) {
+            if (this.state === 'ASCENDING' || this.state === 'DOWN') {
+                this.reps++;
+                this.feedback = `${this.reps}`; // Emits Rep count
+            } else if (this.state === 'DESCENDING' && this.lastAngle > 70) {
+                this.feedback = "Pull higher!";
+            } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
+                this.feedback = "Ready";
+            }
+            this.state = 'UP'; // Arms extended
+        }
+        else if (angleElbow <= 150 && angleElbow > 70) {
+            if (this.state === 'UP') {
+                this.state = 'DESCENDING'; // Starting the pull
+            } else if (this.state === 'DOWN') {
+                this.state = 'ASCENDING'; // Releasing the pull
+            }
+        }
+        else if (angleElbow <= 70) {
+            if (this.state === 'DESCENDING') {
+                this.state = 'DOWN'; // Contracted position
+                this.feedback = "Good pull";
+            }
+        }
+
+        this.lastAngle = angleElbow;
+
+        return {
+            state: this.state,
+            reps: this.reps,
+            feedback: this.feedback,
+            angle: Math.round(angleElbow),
+            label: 'Elbow Angle',
+            instruction: "Camera placement: Camera higher up, capturing full arm extension."
+        };
+    }
+}
+
 class ExerciseEngine {
     constructor() {
         this.profiles = {
             'squat': new SquatProfile(),
-            'pushup': new PushupProfile()
+            'pushup': new PushupProfile(),
+            'pullup': new PullProfile()
         };
         this.currentProfile = this.profiles['squat']; // Default
         this.latestResult = null;
