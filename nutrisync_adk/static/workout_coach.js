@@ -8,6 +8,8 @@
 
 // --- Core Utilities ---
 class MathUtils {
+    static EMA_ALPHA = 0.4;
+
     /**
      * Calculates the angle ABC around vertex B.
      * @param {Object} a {x, y}
@@ -21,6 +23,14 @@ class MathUtils {
         let angle = Math.abs(radians * 180.0 / Math.PI);
         if (angle > 180.0) angle = 360 - angle;
         return angle;
+    }
+
+    /**
+     * Exponential Moving Average to smooth out camera jitter.
+     */
+    static calculateEMA(current, previous) {
+        if (previous === null || previous === undefined || isNaN(previous)) return current;
+        return (current * this.EMA_ALPHA) + (previous * (1 - this.EMA_ALPHA));
     }
 }
 
@@ -71,10 +81,15 @@ class VoiceCoach {
 // --- Exercise Logic Profiles ---
 class SquatProfile {
     constructor() {
+        this.reset();
+    }
+
+    reset() {
         this.state = 'UP';
         this.reps = 0;
         this.feedback = "Ready";
         this.lastAngle = 180;
+        this.smoothedAngle = undefined;
     }
 
     processConstraints(landmarks) {
@@ -91,7 +106,9 @@ class SquatProfile {
         const knee = useLeft ? leftKnee : rightKnee;
         const ankle = useLeft ? leftAnkle : rightAnkle;
 
-        const angleKnee = MathUtils.calculateAngle(hip, knee, ankle);
+        const rawAngleKnee = MathUtils.calculateAngle(hip, knee, ankle);
+        this.smoothedAngle = MathUtils.calculateEMA(rawAngleKnee, this.smoothedAngle);
+        const angleKnee = this.smoothedAngle;
 
         // Exercise Cross-Contamination Filter: Prevent Pushups in Squat Mode
         // 1. In a pushup, the body is stretched out horizontally on the floor.
@@ -118,11 +135,11 @@ class SquatProfile {
 
         // Form & State logic
         // 1. Fully Upright (Extend state reset deeper to ensure they lock out)
-        if (angleKnee > 165) {
+        if (angleKnee > 160) {
             if (this.state === 'ASCENDING' || this.state === 'DOWN') {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count
-            } else if (this.state === 'DESCENDING' && this.lastAngle > 115) {
+            } else if (this.state === 'DESCENDING') {
                 this.feedback = "Squat deeper next time.";
             } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
                 this.feedback = "Ready";
@@ -130,16 +147,16 @@ class SquatProfile {
             this.state = 'UP';
         }
         // 2. Mid descent/ascent
-        else if (angleKnee <= 165 && angleKnee > 115) {
+        else if (angleKnee <= 160 && hip.y < knee.y) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING';
             }
         }
-        // 3. Deep Squat (Hitting depth)
-        // Adjust threshold from <= 115 to <= 115 to require a deep, parallel squat
-        else if (angleKnee <= 115) {
+        // 3. Deep Squat (Hitting depth - Thigh Parallel Heuristic)
+        // Ignoring static angle bounds at the bottom and replacing it with the biomechanical truth: target hip crease below top of knee.
+        else if (hip.y >= knee.y) {
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN';
                 this.feedback = "Good depth, push up!";
@@ -160,10 +177,20 @@ class SquatProfile {
 
 class PushupProfile {
     constructor() {
-        this.state = 'UP';
+        this.reset();
+    }
+
+    reset() {
+        this.state = 'SETUP';
         this.reps = 0;
         this.feedback = "Ready";
         this.lastAngle = 180;
+        this.smoothedAngle = undefined;
+
+        // Calibration
+        this.setupStartTime = 0;
+        this.distances = [];
+        this.maxRange = 0;
     }
 
     processConstraints(landmarks) {
@@ -184,8 +211,43 @@ class PushupProfile {
         const hip = useLeft ? leftHip : rightHip;
         const ankle = useLeft ? leftAnkle : rightAnkle;
 
-        const angleElbow = MathUtils.calculateAngle(shoulder, elbow, wrist);
+        const rawAngleElbow = MathUtils.calculateAngle(shoulder, elbow, wrist);
+        this.smoothedAngle = MathUtils.calculateEMA(rawAngleElbow, this.smoothedAngle);
+        const angleElbow = this.smoothedAngle;
+
         const angleBack = MathUtils.calculateAngle(shoulder, hip, ankle);
+
+        // Dynamic Range Calibration
+        const currentDistance = Math.hypot(shoulder.x - wrist.x, shoulder.y - wrist.y);
+
+        if (this.state === 'SETUP') {
+            if (angleElbow > 150) {
+                if (this.setupStartTime === 0) {
+                    this.setupStartTime = Date.now();
+                    this.feedback = "Hold plank to calibrate...";
+                } else if (Date.now() - this.setupStartTime > 3000) {
+                    this.maxRange = this.distances.reduce((a, b) => a + b, 0) / this.distances.length;
+                    this.state = 'UP';
+                    this.feedback = "Calibrated! Ready.";
+                } else {
+                    this.distances.push(currentDistance);
+                    this.feedback = "Hold plank to calibrate...";
+                }
+            } else {
+                this.setupStartTime = 0;
+                this.distances = [];
+                this.feedback = "Straighten arms to calibrate";
+            }
+
+            return {
+                state: this.state,
+                reps: this.reps,
+                feedback: this.feedback,
+                angle: Math.round(angleElbow),
+                label: 'Setup',
+                instruction: "Keep arms perfectly straight in plank for 3 seconds."
+            };
+        }
 
         // Exercise Cross-Contamination Filter: Prevent Squats in Pushup Mode
         // 1. In a pushup, the body is horizontal. 
@@ -213,26 +275,27 @@ class PushupProfile {
             // We can optionally return early or just let the feedback sit. Let's let it sit.
         }
 
-        // Form & State logic (Elbow angle)
-        if (angleElbow > 165) {
+        // Form & State logic (Dynamic Distance + Smoothed Angle)
+        if (angleElbow > 160) {
             if (this.state === 'ASCENDING' || this.state === 'DOWN') {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count
-            } else if (this.state === 'DESCENDING' && this.lastAngle > 85) {
+            } else if (this.state === 'DESCENDING') {
                 this.feedback = "Go lower!";
-            } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
+            } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== "Calibrated! Ready.") {
                 this.feedback = "Ready";
             }
             this.state = 'UP';
         }
-        else if (angleElbow <= 165 && angleElbow > 85) {
+        else if (angleElbow <= 160 && currentDistance > this.maxRange * 0.45) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING';
             }
         }
-        else if (angleElbow <= 85) {
+        else if (currentDistance <= this.maxRange * 0.45) {
+            // DOWN state dynamically determined by actual pixel distance shrinking
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN';
                 this.feedback = "Good depth, push up!";
@@ -254,10 +317,20 @@ class PushupProfile {
 
 class PullProfile {
     constructor() {
-        this.state = 'UP'; // 'UP' means arms are fully extended (bottom of pull-up, top of pull-down)
+        this.reset();
+    }
+
+    reset() {
+        this.state = 'SETUP'; // Requires calibration first
         this.reps = 0;
         this.feedback = "Ready";
         this.lastAngle = 180;
+        this.smoothedAngle = undefined;
+
+        // Calibration
+        this.setupStartTime = 0;
+        this.distances = [];
+        this.maxRange = 0;
     }
 
     processConstraints(landmarks) {
@@ -274,7 +347,40 @@ class PullProfile {
         const wrist = useLeft ? leftWrist : rightWrist;
         const hip = useLeft ? leftHip : rightHip;
 
-        const angleElbow = MathUtils.calculateAngle(shoulder, elbow, wrist);
+        const rawAngleElbow = MathUtils.calculateAngle(shoulder, elbow, wrist);
+        this.smoothedAngle = MathUtils.calculateEMA(rawAngleElbow, this.smoothedAngle);
+        const angleElbow = this.smoothedAngle;
+
+        // Dynamic Range Calibration
+        const currentDistance = Math.abs(shoulder.y - wrist.y);
+
+        if (this.state === 'SETUP') {
+            if (angleElbow > 150 && wrist.y < shoulder.y) {
+                if (this.setupStartTime === 0) {
+                    this.setupStartTime = Date.now();
+                    this.feedback = "Hang straight to calibrate...";
+                } else if (Date.now() - this.setupStartTime > 3000) {
+                    this.maxRange = this.distances.reduce((a, b) => a + b, 0) / this.distances.length;
+                    this.state = 'UP';
+                    this.feedback = "Calibrated! Ready.";
+                } else {
+                    this.distances.push(currentDistance);
+                    this.feedback = "Hang straight to calibrate...";
+                }
+            } else {
+                this.setupStartTime = 0;
+                this.distances = [];
+                this.feedback = "Fully extend arms over head to calibrate";
+            }
+            return {
+                state: this.state,
+                reps: this.reps,
+                feedback: this.feedback,
+                angle: Math.round(angleElbow),
+                label: 'Setup',
+                instruction: "Keep arms perfectly straight over head for 3 seconds."
+            };
+        }
 
         // Exercise Cross-Contamination Filter: Prevent Squat/Pushup counting as Pull-up
         // In a pulling motion, the hands (wrists) must start and generally remain above the shoulders.
@@ -291,27 +397,26 @@ class PullProfile {
             };
         }
 
-        // Form & State logic (Elbow angle)
-        // 'UP' state refers to arms extended (starting position).
+        // Form & State logic (Dynamic Distance + Smoothed Angle)
         if (angleElbow > 150) {
             if (this.state === 'ASCENDING' || this.state === 'DOWN') {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count
-            } else if (this.state === 'DESCENDING' && this.lastAngle > 70) {
+            } else if (this.state === 'DESCENDING') {
                 this.feedback = "Pull higher!";
-            } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
+            } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== "Calibrated! Ready.") {
                 this.feedback = "Ready";
             }
             this.state = 'UP'; // Arms extended
         }
-        else if (angleElbow <= 150 && angleElbow > 70) {
+        else if (angleElbow <= 150 && currentDistance > this.maxRange * 0.25) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING'; // Starting the pull
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING'; // Releasing the pull
             }
         }
-        else if (angleElbow <= 70) {
+        else if (currentDistance <= this.maxRange * 0.25) {
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN'; // Contracted position
                 this.feedback = "Good pull";
@@ -345,10 +450,8 @@ class ExerciseEngine {
     setExercise(exerciseName) {
         if (this.profiles[exerciseName]) {
             this.currentProfile = this.profiles[exerciseName];
-            // Reset state
-            this.currentProfile.state = 'UP';
-            this.currentProfile.reps = 0;
-            this.currentProfile.feedback = "Ready";
+            // Reset state using profile-specific logic (so SETUP isn't bypassed)
+            this.currentProfile.reset();
             this.latestResult = null;
             return true;
         }
@@ -367,7 +470,7 @@ class ExerciseEngine {
         const rightShoulderVis = landmarks[12]?.visibility || 0;
 
         // If neither the nose nor both shoulders are reasonably visible, we assume it's a false positive object
-        if (noseVis < 0.7 && (leftShoulderVis < 0.7 || rightShoulderVis < 0.7)) {
+        if (noseVis < 0.65 && (leftShoulderVis < 0.65 || rightShoulderVis < 0.65)) {
             return {
                 state: this.currentProfile.state,
                 reps: this.currentProfile.reps,
