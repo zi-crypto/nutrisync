@@ -20,7 +20,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 
 ### 2.2 Product Functions
 - **User Authentication**: Sign in and sign up functionality via Supabase Auth.
-- **Onboarding Wizard**: Multi-step user profile setup including physical stats, goals, experience level, equipment access, workout schedules, diet typings, allergies, and sport types.
+- **Onboarding Wizard**: Multi-step user profile setup including physical stats, goals, experience level, equipment access, granular equipment selection (chip/tag UI with 72+ presets across Gym/Home/Bodyweight tiers), workout schedules, diet typings, allergies, and sport types.
 - **AI Chat Coach**: Conversational interface for tailored fitness/nutrition advice. Maintains context of user profile, daily goals, and persistent context notes.
 - **Data Logging**: Logging workouts, nutrition, sleep, and body composition directly through chat utilizing AI tool calls.
 - **Data Visualization**: AI agent can generate charts (e.g., body weight trends, nutrition breakdown) using QuickChart.io.
@@ -49,11 +49,11 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 
 ### FR-USER-02: Onboarding & Profile Management
 - **Description**: New users must complete an onboarding flow capturing details like DOB, height, weight, target weight, fitness goal, experience, equipment, diet type, allergies, sport type, workout split, and 1RM records.
-- **Implementation**: Frontend maps to `POST /api/profile` to upsert the `user_profile` (including initializing `starting_weight_kg`), generates target macros, handles custom `workout_splits`/`split_items`, and updates `user_1rm_records`. Also logs any provided weight to `body_composition_logs`. Frontend fetches existing profile using `GET /api/profile/{user_id}`.
+- **Implementation**: Frontend maps to `POST /api/profile` to upsert the `user_profile` (including initializing `starting_weight_kg`), generates target macros, handles custom `workout_splits`/`split_items`, updates `user_1rm_records`, and persists the user's specific `equipment_list` to the `user_equipment` table (delete-and-reinsert pattern). Also logs any provided weight to `body_composition_logs`. Frontend fetches existing profile using `GET /api/profile/{user_id}` which also returns the equipment list. The equipment UI features a chip/tag selector with 72+ preset items organized by category (machines, free weights, cardio, accessories) across three tiers (Gym/Home/Bodyweight), plus support for custom equipment entries via a text input.
 
 ### FR-CHAT-01: Conversational AI Coach
 - **Description**: Users can chat with an AI coach that responds with text and charts.
-- **Context Injection**: The `runners.py` fetches user profile, daily goals, current functional time (Cairo timezone logic), and persistent context notes in parallel via `ContextService` (`asyncio.gather`), and injects them into the ADK session state prompt.
+- **Context Injection**: The `runners.py` fetches user profile, daily goals, current functional time (Cairo timezone logic), persistent context notes, and user equipment list in parallel via `ContextService` (`asyncio.gather`), and injects them into the ADK session state via the `state_delta` parameter on `run_async()` (the ADK-recommended approach for `DatabaseSessionService` that persists state through the event system rather than direct `session.state` mutation). An `InstructionProvider` callback (`_build_instruction`) reads state keys and substitutes them into the system prompt template.
 - **Image Support**: Users can upload images which are sent as base64 to the multi-modal GenAI model via data URIs.
 - **Concurrency**: Per-user `asyncio.Lock` prevents ADK session state race conditions.
 
@@ -111,6 +111,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - `message_feedback`: Thumbs up/down and comments mapped to `message_id`.
   - `workout_splits` & `split_items`: Scheduled workout routines (e.g., Push/Pull/Legs).
   - `user_1rm_records`: Max lifts tracked per exercise.
+  - `user_equipment`: Per-user granular equipment inventory (equipment_name, category) with RLS policies and a unique constraint on `(user_id, equipment_name)`.
   - `persistent_context`: Long-term user notes available in agent context.
   - `body_composition_logs`: Tracks weight, muscle kg, bf%, resting HR, and text notes.
   - `nutrition_logs`: Tracks food items, calories, macro splits, and a healthy boolean.

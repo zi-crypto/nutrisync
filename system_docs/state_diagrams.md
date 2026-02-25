@@ -3,7 +3,7 @@
 This document contains text-based state diagrams (Mermaid) representing the actual runtime states and workflows within the NutriSync application.
 
 ## 1. User Onboarding Flow
-Describes the multi-step wizard shown during initial account creation to capture physiological data and goals to formulate the user's macronutrients profile and save 1RM records.
+Describes the multi-step wizard shown during initial account creation to capture physiological data and goals to formulate the user's macronutrients profile, save 1RM records, and persist granular equipment selections.
 
 ```mermaid
 stateDiagram-v2
@@ -18,7 +18,7 @@ stateDiagram-v2
     Step1_Basics --> Step2_BodyStats : Next (Name entered)
     Step2_BodyStats --> Step3_Goals : Next (Gender/DOB/Height/Weight entered)
     Step3_Goals --> Step4_Logistics : Next (Goal/Experience, Target Weight entered)
-    Step4_Logistics --> Step5_Sport : Next (Workout Days/Equipment entered)
+    Step4_Logistics --> Step5_Sport : Next (Workout Days/Equipment Tier/Equipment Chips entered)
     Step5_Sport --> Step6_Nutrition : Next (Activity/Split/1RM Records entered)
     Step6_Nutrition --> ProfileSaving : Finish (Typical Diet/Allergies entered)
     
@@ -95,12 +95,14 @@ stateDiagram-v2
      [*] --> FetchProfile
      [*] --> FetchDailyGoals
      [*] --> FetchPersistentContext
+     [*] --> FetchUserEquipment
      FetchProfile --> MergeContext
      FetchDailyGoals --> MergeContext
      FetchPersistentContext --> MergeContext
+     FetchUserEquipment --> MergeContext
   }
   
-  MergeContext --> SessionUpdate : Setup/Update ADK session.state with Context
+  MergeContext --> SessionUpdate : Apply state_delta via run_async() (ADK event-based state persistence)
   SessionUpdate --> UserMessageLogged : Dual-write User Message to `chat_history`
   
   UserMessageLogged --> AgentExecution : Dispatch streaming async event generator

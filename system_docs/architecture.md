@@ -83,7 +83,7 @@ C4Component
         Component(tool_utils, "utils.py", "Python", "Database client, time logic, get_health_scores.")
     }
     
-    Component(context_svc, "Context Service (local_context.py)", "Python", "Fetches dynamic user data (profile, goals, notes) in parallel for the prompt.")
+    Component(context_svc, "Context Service (local_context.py)", "Python", "Fetches dynamic user data (profile, goals, notes, equipment) in parallel for the prompt.")
     Component(history_svc, "History Service (history_service.py)", "Python", "Manages dual-write chat/tool history and retrieval.")
   }
 
@@ -104,8 +104,8 @@ C4Component
   Rel(tools_bound, db, "Reads/Writes data via Supabase")
   Rel(tool_utils, edge_fn, "Invokes user-improvement-scorer via supabase functions invoke")
   Rel(history_svc, db, "Reads/Writes history")
-  Rel(context_svc, db, "Reads active profiles, notes, daily_goals")
-  Rel(main_py, db, "Reads/Writes profiles and 1RM records directly")
+  Rel(context_svc, db, "Reads active profiles, notes, daily_goals, user_equipment")
+  Rel(main_py, db, "Reads/Writes profiles, 1RM records, and user equipment directly")
 ```
 
 ## 3. Internal Component Breakdown
@@ -118,13 +118,13 @@ C4Component
 
 ### Backend Services (`nutrisync_adk/`)
 - **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/chat/feedback`, `/health`) and offline calculation of physiological formulas (Mifflin-St Jeor equation for macros/TDEE). Handles base64 data URI image decoding.
-- **Runners (`runners.py`)**: Responsible for connecting the FastAPI requests to the ADK Agent, managing asynchronous database sessions utilizing `DatabaseSessionService`, and applying per-user `asyncio.Lock` mechanisms to prevent race conditions during ADK state updates.
+- **Runners (`runners.py`)**: Responsible for connecting the FastAPI requests to the ADK Agent, managing asynchronous database sessions utilizing `DatabaseSessionService`, and applying per-user `asyncio.Lock` mechanisms to prevent race conditions during ADK state updates. Uses `state_delta` parameter in `run_async()` (rather than direct `session.state` mutation) to inject dynamic context (profile, daily totals, active notes, equipment list) into the ADK session state per the official ADK best practice for `DatabaseSessionService`.
 - **Agent Sandbox (`agents/coach.py`)**: Agent configuration mapping the `gemini-flash-latest` model and 16 distinct tools registered to the `coach_agent`.
-- **Context & History Services (`services/`)**: `local_context.py` loads `user_profile`, `daily_goals`, and `persistent_context` simultaneously via `asyncio.gather`. `history_service.py` manages chronological chat and tool history dual-writes.
+- **Context & History Services (`services/`)**: `local_context.py` loads `user_profile`, `daily_goals`, `persistent_context`, and `user_equipment` simultaneously via `asyncio.gather`. `history_service.py` manages chronological chat and tool history dual-writes.
 - **Tools (`tools/`)**: Modular python files encapsulating domain-specific logic. They use `get_current_functional_time()` in `utils.py` to correctly map late-night entries (e.g., 2 AM) to the functional prior calendar day. `charts.py` builds fully tailored Chart.js configurations and converts them to images via QuickChart.
 
 ### Database Layer (Supabase)
-- Uses **PostgreSQL** configured with **RLS (Row-Level Security)** enforcing isolated tenant access via JWT token exchange. Tables map tightly to backend fetching (e.g., `user_profile`, `daily_goals`, `user_1rm_records`, `workout_splits`, `persistent_context`).
+- Uses **PostgreSQL** configured with **RLS (Row-Level Security)** enforcing isolated tenant access via JWT token exchange. Tables map tightly to backend fetching (e.g., `user_profile`, `daily_goals`, `user_1rm_records`, `workout_splits`, `persistent_context`, `user_equipment`).
 - Connection pooling uses `asyncpg` with zero statement caching (`prepared_statement_cache_size=0`) to ensure compatibility with Supabase's `Supavisor` connection pooler.
 - **Edge Functions** execute intensive or cron-triggered logical operations separately (e.g. `user-improvement-scorer`), saving results to `scores_snapshots` and domain-specific `*_improvement_snapshots` tables.
 - **ADK Internals** manage Google ADK execution state via tables such as `sessions`, `app_states`, and `events`.
