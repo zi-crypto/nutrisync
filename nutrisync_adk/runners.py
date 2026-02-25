@@ -53,6 +53,12 @@ async def _build_instruction(ctx: ReadonlyContext) -> str:
     daily_totals = ctx.state.get("daily_totals", "{}")
     current_time = ctx.state.get("current_time", "Unknown")
     active_notes = ctx.state.get("active_notes", "None")
+    equipment_list = ctx.state.get("equipment_list", "None")
+
+    # DEBUG: Log all state keys and equipment value
+    all_keys = list(ctx.state.keys()) if hasattr(ctx.state, 'keys') else "NOT A DICT"
+    logger.info(f"[_build_instruction] State keys: {all_keys}")
+    logger.info(f"[_build_instruction] equipment_list value: '{equipment_list}'")
 
     # Manually substitute our known placeholders.
     # We do NOT use str.format() because the prompt contains literal {braces}
@@ -62,6 +68,7 @@ async def _build_instruction(ctx: ReadonlyContext) -> str:
     result = result.replace("{daily_totals}", daily_totals)
     result = result.replace("{current_time}", current_time)
     result = result.replace("{active_notes}", active_notes)
+    result = result.replace("{equipment_list}", equipment_list)
 
     return result
 
@@ -183,12 +190,12 @@ class NutriSyncRunner:
             "daily_totals": json.dumps(context_data.get("daily_totals", {}), indent=2, default=str),
             "current_time": context_data.get("current_time", "Unknown"),
             "active_notes": self._format_notes(context_data.get("active_notes", [])),
+            "equipment_list": ", ".join(context_data.get("equipment_list", [])) or "None specified",
         }
+        logger.info(f"Equipment context for {user_id}: {state_updates['equipment_list']}")
 
-        # 3. Get or create session, update state
+        # 3. Get or create session (state_updates applied via state_delta in run_async)
         session = await self._get_or_create_session(user_id, state=state_updates)
-        # Update state on existing session for fresh context each turn
-        session.state.update(state_updates)
 
         # 4. Dual-write: Save User Message to chat_history table (for frontend)
         img_b64 = None
@@ -217,6 +224,7 @@ class NutriSyncRunner:
             user_id=user_id,
             session_id=session.id,
             new_message=user_msg,
+            state_delta=state_updates,
         ):
             # Capture tool calls from events for logging
             if hasattr(event, 'content') and event.content:

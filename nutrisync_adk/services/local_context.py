@@ -32,18 +32,22 @@ class ContextService:
             task_goals = self._fetch_daily_goals(user_id)
             # 3. Active Notes
             task_notes = self._fetch_active_notes(user_id)
+            # 4. User Equipment
+            task_equipment = self._fetch_user_equipment(user_id)
 
             # Execute
-            results = await asyncio.gather(task_profile, task_goals, task_notes, return_exceptions=True)
+            results = await asyncio.gather(task_profile, task_goals, task_notes, task_equipment, return_exceptions=True)
             
             # Unpack results handling exceptions
             profile = results[0] if not isinstance(results[0], Exception) else {}
             daily_totals = results[1] if not isinstance(results[1], Exception) else self._get_empty_goals()
             active_notes = results[2] if not isinstance(results[2], Exception) else []
+            equipment_list = results[3] if not isinstance(results[3], Exception) else []
             
             if isinstance(results[0], Exception): logger.error(f"Error fetching profile: {results[0]}")
             if isinstance(results[1], Exception): logger.error(f"Error fetching goals: {results[1]}")
             if isinstance(results[2], Exception): logger.error(f"Error fetching notes: {results[2]}")
+            if isinstance(results[3], Exception): logger.error(f"Error fetching equipment: {results[3]}")
 
             # Current Time String
             now = get_current_functional_time()
@@ -54,7 +58,8 @@ class ContextService:
                 "profile": profile,
                 "daily_totals": daily_totals,
                 "current_time": current_time_str,
-                "active_notes": active_notes
+                "active_notes": active_notes,
+                "equipment_list": equipment_list
             }
 
         except Exception as e:
@@ -64,7 +69,8 @@ class ContextService:
                 "profile": {},
                 "daily_totals": self._get_empty_goals(),
                 "current_time": "Unknown",
-                "active_notes": []
+                "active_notes": [],
+                "equipment_list": []
             }
 
     async def _fetch_user_profile(self, user_id: str) -> Dict[str, Any]:
@@ -120,6 +126,15 @@ class ContextService:
                         pass
                 notes.append(f"{content}{time_suffix}")
         return notes
+
+    async def _fetch_user_equipment(self, user_id: str) -> List[str]:
+        return await asyncio.to_thread(self._fetch_user_equipment_sync, user_id)
+
+    def _fetch_user_equipment_sync(self, user_id: str) -> List[str]:
+        res = self.supabase.table("user_equipment").select("equipment_name").eq("user_id", user_id).execute()
+        if res.data:
+            return [row["equipment_name"] for row in res.data]
+        return []
 
     def _get_empty_goals(self) -> Dict[str, Any]:
         return {

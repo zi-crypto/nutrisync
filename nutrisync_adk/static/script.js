@@ -959,6 +959,273 @@ document.addEventListener('DOMContentLoaded', async () => {
     const profileSport = document.getElementById('profile-sport');
     const gymOptions = document.getElementById('gym-options');
 
+    // ── Equipment Preset Data (researched from comprehensive gym equipment lists) ──
+    const EQUIPMENT_PRESETS = {
+        "Gym": {
+            "Chest & Arms Machines": [
+                "Chest Press Machine", "Chest Fly / Pec Deck", "Seated Dip Machine",
+                "Arm Curl Machine", "Arm Extension Machine", "Tricep Press Machine",
+                "Preacher Curl Bench"
+            ],
+            "Shoulder Machines": [
+                "Shoulder Press Machine", "Lateral Raise Machine"
+            ],
+            "Back Machines": [
+                "Lat Pulldown Machine", "Seated Cable Row", "Back Extension / Roman Chair",
+                "GHD Machine", "T-Bar Row Machine"
+            ],
+            "Leg Machines": [
+                "Leg Press Machine", "Hack Squat Machine", "Leg Extension Machine",
+                "Leg Curl Machine", "Hip Abductor / Adductor", "Seated Calf Raise",
+                "Standing Calf Raise", "Glute Kickback Machine"
+            ],
+            "Core Machines": [
+                "Ab Crunch Machine", "Rotary Torso Machine", "Leg Raise / Dip Tower",
+                "Abdominal Bench"
+            ],
+            "Multi-Station & Cables": [
+                "Cable Crossover Machine", "Functional Trainer", "Smith Machine",
+                "Power Rack / Squat Rack"
+            ],
+            "Free Weights": [
+                "Barbell (Olympic)", "EZ-Curl Bar", "Dumbbells (Fixed)",
+                "Adjustable Dumbbells", "Kettlebells", "Weight Plates",
+                "Trap Bar / Hex Bar"
+            ],
+            "Benches": [
+                "Flat Bench", "Adjustable Bench (Incline/Decline)", "Olympic Weight Bench",
+                "Decline Bench"
+            ],
+            "Cardio Machines": [
+                "Treadmill", "Elliptical / Cross Trainer", "Stationary Bike (Upright)",
+                "Recumbent Bike", "Spin Bike", "Rowing Machine", "Stair Climber / StepMill",
+                "Air Bike", "Ski Erg", "Vertical Climber"
+            ],
+            "Accessories": [
+                "Resistance Bands", "Pull-Up Bar", "Dip Station", "Ab Roller",
+                "Battle Ropes", "Suspension Trainer (TRX)", "Medicine Ball",
+                "Stability / Swiss Ball", "Foam Roller", "Plyometric Box",
+                "Jump Rope", "Gymnastic Rings", "Landmine Attachment",
+                "Weighted Vest", "Ankle Weights"
+            ]
+        },
+        "Home": {
+            "Free Weights": [
+                "Dumbbells (Fixed)", "Adjustable Dumbbells", "Kettlebells",
+                "Barbell (Olympic)", "EZ-Curl Bar", "Weight Plates"
+            ],
+            "Benches & Racks": [
+                "Adjustable Bench (Incline/Decline)", "Flat Bench", "Power Rack / Squat Rack",
+                "Smith Machine"
+            ],
+            "Cardio": [
+                "Treadmill", "Stationary Bike (Upright)", "Spin Bike",
+                "Rowing Machine", "Elliptical / Cross Trainer", "Air Bike", "Jump Rope"
+            ],
+            "Bodyweight & Accessories": [
+                "Pull-Up Bar", "Dip Station", "Resistance Bands",
+                "Suspension Trainer (TRX)", "Ab Roller", "Plyometric Box",
+                "Stability / Swiss Ball", "Medicine Ball", "Foam Roller",
+                "Gymnastic Rings", "Push-Up Bars", "Weighted Vest", "Battle Ropes"
+            ]
+        },
+        "Bodyweight": {
+            "Bodyweight Equipment": [
+                "Pull-Up Bar", "Dip Station", "Gymnastic Rings",
+                "Push-Up Bars", "Ab Roller", "Plyometric Box"
+            ],
+            "Accessories": [
+                "Resistance Bands", "Suspension Trainer (TRX)", "Jump Rope",
+                "Foam Roller", "Stability / Swiss Ball", "Weighted Vest",
+                "Ankle Weights", "Yoga Mat"
+            ]
+        }
+    };
+
+    // ── Equipment Chip Rendering ──
+    let selectedEquipment = new Set();
+
+    function renderEquipmentChips(tier) {
+        const container = document.getElementById('equipment-chips-container');
+        if (!container) return;
+        container.innerHTML = '';
+        const presets = EQUIPMENT_PRESETS[tier] || EQUIPMENT_PRESETS["Gym"];
+
+        Object.entries(presets).forEach(([category, items]) => {
+            const block = document.createElement('div');
+            block.className = 'equip-category-block';
+
+            const label = document.createElement('span');
+            label.className = 'equip-category-label';
+            label.textContent = category;
+            block.appendChild(label);
+
+            const chipsWrap = document.createElement('div');
+            chipsWrap.className = 'equip-category-chips';
+
+            items.forEach(name => {
+                const chip = document.createElement('span');
+                chip.className = 'equip-chip' + (selectedEquipment.has(name) ? ' selected' : '');
+                chip.textContent = name;
+                chip.dataset.name = name;
+                chip.dataset.category = category;
+                chip.addEventListener('click', () => {
+                    if (selectedEquipment.has(name)) {
+                        selectedEquipment.delete(name);
+                        chip.classList.remove('selected');
+                    } else {
+                        selectedEquipment.add(name);
+                        chip.classList.add('selected');
+                    }
+                    updateSelectAllBtnState(tier);
+                });
+                chipsWrap.appendChild(chip);
+            });
+
+            block.appendChild(chipsWrap);
+            container.appendChild(block);
+        });
+
+        // Re-render any custom chips that are not in presets
+        const allPresetNames = new Set(Object.values(presets).flat());
+        selectedEquipment.forEach(name => {
+            if (!allPresetNames.has(name)) {
+                addCustomChipToDOM(name);
+            }
+        });
+
+        updateSelectAllBtnState(tier);
+    }
+
+    function addCustomChipToDOM(name) {
+        const container = document.getElementById('equipment-chips-container');
+        // Check if a "Custom" category block exists, if not create one
+        let customBlock = container.querySelector('.equip-category-block[data-custom="true"]');
+        if (!customBlock) {
+            customBlock = document.createElement('div');
+            customBlock.className = 'equip-category-block';
+            customBlock.dataset.custom = "true";
+            const label = document.createElement('span');
+            label.className = 'equip-category-label';
+            label.textContent = 'Custom';
+            customBlock.appendChild(label);
+            const chipsWrap = document.createElement('div');
+            chipsWrap.className = 'equip-category-chips';
+            customBlock.appendChild(chipsWrap);
+            container.appendChild(customBlock);
+        }
+        const chipsWrap = customBlock.querySelector('.equip-category-chips');
+
+        const chip = document.createElement('span');
+        chip.className = 'equip-chip custom-chip selected';
+        chip.dataset.name = name;
+        chip.dataset.category = 'Custom';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = name;
+        chip.appendChild(textSpan);
+
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'remove-custom';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectedEquipment.delete(name);
+            chip.remove();
+            // Clean up empty custom block
+            if (chipsWrap.children.length === 0) customBlock.remove();
+        });
+        chip.appendChild(removeBtn);
+
+        chip.addEventListener('click', () => {
+            if (selectedEquipment.has(name)) {
+                selectedEquipment.delete(name);
+                chip.classList.remove('selected');
+            } else {
+                selectedEquipment.add(name);
+                chip.classList.add('selected');
+            }
+        });
+
+        chipsWrap.appendChild(chip);
+    }
+
+    function getAllPresetNamesForTier(tier) {
+        const presets = EQUIPMENT_PRESETS[tier] || EQUIPMENT_PRESETS["Gym"];
+        return new Set(Object.values(presets).flat());
+    }
+
+    function updateSelectAllBtnState(tier) {
+        const btn = document.getElementById('equip-select-all-btn');
+        if (!btn) return;
+        const allNames = getAllPresetNamesForTier(tier);
+        const allSelected = [...allNames].every(n => selectedEquipment.has(n));
+        btn.textContent = allSelected ? '✅ All Selected' : '✅ Select All';
+    }
+
+    // ── Equipment Event Listeners ──
+    const equipSelectAllBtn = document.getElementById('equip-select-all-btn');
+    if (equipSelectAllBtn) {
+        equipSelectAllBtn.addEventListener('click', () => {
+            const tier = document.getElementById('profile-equipment').value;
+            const allNames = getAllPresetNamesForTier(tier);
+            allNames.forEach(n => selectedEquipment.add(n));
+            renderEquipmentChips(tier);
+        });
+    }
+
+    const equipDeselectAllBtn = document.getElementById('equip-deselect-all-btn');
+    if (equipDeselectAllBtn) {
+        equipDeselectAllBtn.addEventListener('click', () => {
+            const tier = document.getElementById('profile-equipment').value;
+            const allNames = getAllPresetNamesForTier(tier);
+            // Only clear preset items for current tier; keep custom items
+            allNames.forEach(n => selectedEquipment.delete(n));
+            renderEquipmentChips(tier);
+        });
+    }
+
+    const equipCustomAddBtn = document.getElementById('equip-custom-add-btn');
+    const equipCustomInput = document.getElementById('equip-custom-input');
+    if (equipCustomAddBtn && equipCustomInput) {
+        const addCustomEquipment = () => {
+            const name = equipCustomInput.value.trim();
+            if (name && !selectedEquipment.has(name)) {
+                selectedEquipment.add(name);
+                addCustomChipToDOM(name);
+            }
+            equipCustomInput.value = '';
+        };
+        equipCustomAddBtn.addEventListener('click', addCustomEquipment);
+        equipCustomInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addCustomEquipment();
+            }
+        });
+    }
+
+    // Re-render chips when equipment tier changes
+    const profileEquipmentSelect = document.getElementById('profile-equipment');
+    if (profileEquipmentSelect) {
+        profileEquipmentSelect.addEventListener('change', () => {
+            // Keep custom items, clear preset selections, render new tier
+            const newTier = profileEquipmentSelect.value;
+            // Clear all preset from ALL tiers, keep only custom
+            const allKnown = new Set();
+            Object.values(EQUIPMENT_PRESETS).forEach(tierObj => {
+                Object.values(tierObj).forEach(items => items.forEach(n => allKnown.add(n)));
+            });
+            const customItems = [...selectedEquipment].filter(n => !allKnown.has(n));
+            selectedEquipment.clear();
+            customItems.forEach(n => selectedEquipment.add(n));
+            renderEquipmentChips(newTier);
+        });
+    }
+
+    // Initial render of equipment chips
+    renderEquipmentChips(profileEquipmentSelect ? profileEquipmentSelect.value : 'Gym');
+
     if (profileSport) {
         profileSport.addEventListener('change', () => {
             if (profileSport.value === 'Gym') {
@@ -1234,6 +1501,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // New Fields
             sport_type: document.getElementById('profile-sport').value,
             equipment_access: document.getElementById('profile-equipment').value, // Might be hidden but value remains
+            equipment_list: [...selectedEquipment],
             split_schedule: splitSchedule,
             one_rm_records: oneRmRecords,
 
@@ -1245,7 +1513,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // If not Gym, wipe split schedule? Or keep as generic?
         if (formData.sport_type !== 'Gym') {
             formData.split_schedule = [];
-            // Maybe set equipment to 'None' or keep user selection?
+            formData.equipment_list = [];
             // User requested "equipment is significant only in gym sports". 
             // So we can clear it or set based on logic. Let's keep it simple.
         }
@@ -1337,6 +1605,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     if (profile.sport_type === 'Gym') {
                         document.getElementById('profile-equipment').value = profile.equipment_access || "Gym";
+
+                        // Pre-fill Equipment Chips
+                        selectedEquipment.clear();
+                        if (profile.equipment_list && profile.equipment_list.length > 0) {
+                            profile.equipment_list.forEach(name => selectedEquipment.add(name));
+                        }
+                        renderEquipmentChips(profile.equipment_access || "Gym");
 
                         // Pre-fill RM Editor
                         if (profile.one_rm_records) {

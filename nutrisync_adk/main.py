@@ -127,6 +127,7 @@ class ProfileRequest(BaseModel):
     sport_type: Optional[str] = None
     split_schedule: Optional[List[str]] = None # List of day names e.g. ["Push", "Pull", "Legs"]
     one_rm_records: Optional[list[dict]] = None # List of {"exercise_name": "Squat", "weight_kg": 100}
+    equipment_list: Optional[List[str]] = None # List of specific equipment names e.g. ["Barbell", "Cable Machine"]
 
 def calculate_targets(data: dict) -> dict:
     """
@@ -233,6 +234,10 @@ async def get_profile(user_id: str):
         records_res = runner.supabase.table("user_1rm_records").select("exercise_name, weight_kg").eq("user_id", user_id).execute()
         profile_data['one_rm_records'] = records_res.data if records_res.data else []
         
+        # Fetch User Equipment
+        equip_res = runner.supabase.table("user_equipment").select("equipment_name").eq("user_id", user_id).execute()
+        profile_data['equipment_list'] = [e['equipment_name'] for e in equip_res.data] if equip_res.data else []
+        
         return profile_data
         
     except Exception as e:
@@ -251,6 +256,7 @@ async def update_profile(request: ProfileRequest):
         # Extract Split Schedule and 1RM Records
         split_schedule = data.pop("split_schedule", None)
         one_rm_records = data.pop("one_rm_records", None)
+        equipment_list = data.pop("equipment_list", None)
         
         # Calculate Targets
         targets = calculate_targets(data) 
@@ -325,6 +331,18 @@ async def update_profile(request: ProfileRequest):
                     runner.supabase.table("user_1rm_records").update({"weight_kg": record_data["weight_kg"]}).eq("id", existing.data[0]["id"]).execute()
                 else:
                     runner.supabase.table("user_1rm_records").insert(record_data).execute()
+
+        # Handle Equipment List
+        if equipment_list is not None:
+            # Delete old equipment for this user
+            runner.supabase.table("user_equipment").delete().eq("user_id", request.user_id).execute()
+            # Insert new equipment selections
+            if equipment_list:
+                equip_rows = [
+                    {"user_id": request.user_id, "equipment_name": name, "category": "User Selected"}
+                    for name in equipment_list
+                ]
+                runner.supabase.table("user_equipment").insert(equip_rows).execute()
 
         return {"status": "success", "message": "Profile updated", "targets": targets}
     except Exception as e:

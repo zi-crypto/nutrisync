@@ -273,6 +273,21 @@
                             </select>
                         </div>
 
+                        <div class="form-group" id="equipment-chips-section">
+                            <label>Your Specific Equipment <span style="font-weight:400;color:rgba(255,255,255,0.5);font-size:0.85rem;">(select what you have)</span></label>
+                            <div class="equip-select-all-row">
+                                <button type="button" id="equip-select-all-btn" class="secondary-btn" style="font-size:0.8rem;padding:6px 14px;width:auto;">✅ Select All</button>
+                                <button type="button" id="equip-deselect-all-btn" class="secondary-btn" style="font-size:0.8rem;padding:6px 14px;width:auto;">Clear All</button>
+                            </div>
+                            <div id="equipment-chips-container" class="equipment-chips-container">
+                                <!-- Chips will be injected by JS -->
+                            </div>
+                            <div class="equip-custom-row" style="margin-top:10px;display:flex;gap:8px;">
+                                <input type="text" id="equip-custom-input" placeholder="Add custom equipment..." style="flex:1;">
+                                <button type="button" id="equip-custom-add-btn" class="secondary-btn" style="padding:8px 14px;width:auto;font-size:0.85rem;">+ Add</button>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>1RM (1 Rep Max) Records (Optional)</label>
                             <p
