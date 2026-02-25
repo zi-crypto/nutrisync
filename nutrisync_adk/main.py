@@ -126,6 +126,7 @@ class ProfileRequest(BaseModel):
     allergies: Optional[str] = None
     sport_type: Optional[str] = None
     split_schedule: Optional[List[str]] = None # List of day names e.g. ["Push", "Pull", "Legs"]
+    one_rm_records: Optional[list[dict]] = None # List of {"exercise_name": "Squat", "weight_kg": 100}
 
 def calculate_targets(data: dict) -> dict:
     """
@@ -227,6 +228,11 @@ async def get_profile(user_id: str):
                 split_schedule = [item['workout_name'] for item in items_res.data]
         
         profile_data['split_schedule'] = split_schedule
+        
+        # Fetch 1RM Records
+        records_res = runner.supabase.table("user_1rm_records").select("exercise_name, weight_kg").eq("user_id", user_id).execute()
+        profile_data['one_rm_records'] = records_res.data if records_res.data else []
+        
         return profile_data
         
     except Exception as e:
@@ -242,8 +248,9 @@ async def update_profile(request: ProfileRequest):
         data = request.dict(exclude_unset=True)
         current_weight = data.get("weight_kg", None) # Don't pop, keep in data for profile update
         
-        # Extract Split Schedule
+        # Extract Split Schedule and 1RM Records
         split_schedule = data.pop("split_schedule", None)
+        one_rm_records = data.pop("one_rm_records", None)
         
         # Calculate Targets
         targets = calculate_targets(data) 
@@ -300,6 +307,24 @@ async def update_profile(request: ProfileRequest):
                 
                 if items_data:
                     runner.supabase.table("split_items").insert(items_data).execute()
+
+        # Handle 1RM Records
+        if one_rm_records is not None:
+            # Upsert records using unique constraint
+            for record in one_rm_records:
+                record_data = {
+                    "user_id": request.user_id,
+                    "exercise_name": record.get("exercise_name"),
+                    "weight_kg": record.get("weight_kg")
+                }
+                
+                # Check for existing
+                existing = runner.supabase.table("user_1rm_records").select("id").eq("user_id", request.user_id).eq("exercise_name", record_data["exercise_name"]).execute()
+                
+                if existing.data and len(existing.data) > 0:
+                    runner.supabase.table("user_1rm_records").update({"weight_kg": record_data["weight_kg"]}).eq("id", existing.data[0]["id"]).execute()
+                else:
+                    runner.supabase.table("user_1rm_records").insert(record_data).execute()
 
         return {"status": "success", "message": "Profile updated", "targets": targets}
     except Exception as e:

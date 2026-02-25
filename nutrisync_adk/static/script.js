@@ -898,6 +898,63 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // --- 1RM Editor Functions ---
+    function renderRMEditor(records = []) {
+        const container = document.getElementById('rm-editor-container');
+        container.innerHTML = '';
+        records.forEach(record => {
+            addRMRow(record.exercise_name, record.weight_kg);
+        });
+    }
+
+    function addRMRow(exerciseName = "", weightKg = "") {
+        const container = document.getElementById('rm-editor-container');
+
+        const row = document.createElement('div');
+        row.className = 'rm-record-row';
+        row.style.display = 'flex';
+        row.style.gap = '8px';
+        row.style.alignItems = 'center';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = exerciseName;
+        nameInput.className = 'rm-exercise-input';
+        nameInput.placeholder = `Exercise (e.g. Squat)`;
+        nameInput.style.flex = '2';
+
+        const weightInput = document.createElement('input');
+        weightInput.type = 'number';
+        weightInput.value = weightKg;
+        weightInput.className = 'rm-weight-input';
+        weightInput.placeholder = `Weight (kg)`;
+        weightInput.step = '0.5';
+        weightInput.style.flex = '1';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.innerText = '×';
+        removeBtn.className = 'secondary-btn';
+        removeBtn.style.padding = '4px 8px';
+        removeBtn.style.color = '#f85149';
+        removeBtn.style.borderColor = 'rgba(248, 81, 73, 0.4)';
+        removeBtn.onclick = () => {
+            row.remove();
+        };
+
+        row.appendChild(nameInput);
+        row.appendChild(weightInput);
+        row.appendChild(removeBtn);
+        container.appendChild(row);
+    }
+
+    const addRMBtn = document.getElementById('add-rm-btn');
+    if (addRMBtn) {
+        addRMBtn.addEventListener('click', () => {
+            addRMRow();
+        });
+    }
+
     // Event Listeners for Split/Sport
     const profileSport = document.getElementById('profile-sport');
     const gymOptions = document.getElementById('gym-options');
@@ -1148,6 +1205,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         const splitInputs = document.querySelectorAll('.split-day-input');
         const splitSchedule = Array.from(splitInputs).map(input => input.value).filter(val => val.trim() !== "");
 
+        // Collect 1RM Data
+        const rmRows = document.querySelectorAll('.rm-record-row');
+        const oneRmRecords = [];
+        rmRows.forEach(row => {
+            const exercise = row.querySelector('.rm-exercise-input').value.trim();
+            const weight = parseFloat(row.querySelector('.rm-weight-input').value);
+            if (exercise && !isNaN(weight)) {
+                oneRmRecords.push({
+                    exercise_name: exercise,
+                    weight_kg: weight
+                });
+            }
+        });
+
         const formData = {
             user_id: userId,
             name: document.getElementById('profile-name').value,
@@ -1164,6 +1235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             sport_type: document.getElementById('profile-sport').value,
             equipment_access: document.getElementById('profile-equipment').value, // Might be hidden but value remains
             split_schedule: splitSchedule,
+            one_rm_records: oneRmRecords,
 
             typical_diet_type: document.getElementById('profile-diet-type').value,
             typical_daily_calories: parseInt(document.getElementById('profile-calories').value),
@@ -1265,6 +1337,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     if (profile.sport_type === 'Gym') {
                         document.getElementById('profile-equipment').value = profile.equipment_access || "Gym";
+
+                        // Pre-fill RM Editor
+                        if (profile.one_rm_records) {
+                            renderRMEditor(profile.one_rm_records);
+                        } else {
+                            renderRMEditor([]);
+                        }
+
                         // Pre-fill Split Editor
                         if (profile.split_schedule && profile.split_schedule.length > 0) {
                             document.getElementById('profile-split-template').value = "Custom";

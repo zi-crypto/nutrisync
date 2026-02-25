@@ -398,6 +398,8 @@ button:hover {
     border-radius: 24px;
     width: 360px;
     max-width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     text-align: center;
     transform: translateY(0);

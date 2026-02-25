@@ -119,11 +119,8 @@ class SquatProfile {
         const shoulder = useLeft ? leftShoulder : rightShoulder;
         const horizontalDistance = Math.abs(shoulder.x - ankle.x);
 
-        // Also check if the torso is completely plank-straight to the floor (Shoulder-Hip-Ankle ~ 180)
-        const angleBack = MathUtils.calculateAngle(shoulder, hip, ankle);
-
-        // If body is stretched across screen (> 35% of width) OR back is perfectly straight while knee bends
-        if (horizontalDistance > 0.35 || angleBack > 165) {
+        // If body is stretched across screen (> 35% of width)
+        if (horizontalDistance > 0.35) {
             return {
                 state: this.state, // Preserve state so it doesn't reset
                 reps: this.reps,
@@ -136,9 +133,9 @@ class SquatProfile {
         // Form & State logic
         // 1. Fully Upright (Extend state reset deeper to ensure they lock out)
         if (angleKnee > 160) {
-            if (this.state === 'ASCENDING' || this.state === 'DOWN') {
+            if (this.state === 'ASCENDING') {
                 this.reps++;
-                this.feedback = `${this.reps}`; // Emits Rep count
+                this.feedback = `${this.reps}`; // Emits Rep count only on completion
             } else if (this.state === 'DESCENDING') {
                 this.feedback = "Squat deeper next time.";
             } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
@@ -150,6 +147,7 @@ class SquatProfile {
         else if (angleKnee <= 160 && hip.y < knee.y) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
+                this.feedback = "Ready"; // Clear previous rep count
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING';
             }
@@ -277,9 +275,9 @@ class PushupProfile {
 
         // Form & State logic (Dynamic Distance + Smoothed Angle)
         if (angleElbow > 160) {
-            if (this.state === 'ASCENDING' || this.state === 'DOWN') {
+            if (this.state === 'ASCENDING') {
                 this.reps++;
-                this.feedback = `${this.reps}`; // Emits Rep count
+                this.feedback = `${this.reps}`; // Emits Rep count only on completion
             } else if (this.state === 'DESCENDING') {
                 this.feedback = "Go lower!";
             } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== "Calibrated! Ready.") {
@@ -290,6 +288,7 @@ class PushupProfile {
         else if (angleElbow <= 160 && currentDistance > this.maxRange * 0.45) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
+                this.feedback = "Ready"; // Clear previous rep count
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING';
             }
@@ -399,9 +398,9 @@ class PullProfile {
 
         // Form & State logic (Dynamic Distance + Smoothed Angle)
         if (angleElbow > 150) {
-            if (this.state === 'ASCENDING' || this.state === 'DOWN') {
+            if (this.state === 'ASCENDING') {
                 this.reps++;
-                this.feedback = `${this.reps}`; // Emits Rep count
+                this.feedback = `${this.reps}`; // Emits Rep count only on completion
             } else if (this.state === 'DESCENDING') {
                 this.feedback = "Pull higher!";
             } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== "Calibrated! Ready.") {
@@ -412,6 +411,7 @@ class PullProfile {
         else if (angleElbow <= 150 && currentDistance > this.maxRange * 0.25) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING'; // Starting the pull
+                this.feedback = "Ready"; // Clear previous rep count
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING'; // Releasing the pull
             }
