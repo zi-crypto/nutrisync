@@ -69,11 +69,11 @@ C4Component
   title Component diagram for the Backend Application
 
   Container_Boundary(api_bound, "Backend API (nutrisync_adk)") {
-    Component(main_py, "Main Router (main.py)", "FastAPI", "Entry point, route definitions: /api/chat, /api/profile, /api/history, /api/chat/feedback, /health.")
-    Component(runner_py, "ADK Runner (runners.py)", "Python", "Manages Google ADK Context, States, locks, and Agent execution.")
+    Component(main_py, "Main Router (main.py)", "FastAPI", "Entry point, route definitions: /api/chat, /api/profile, /api/history, /api/chat/feedback, /api/workout-plan, /api/progress, /api/muscle-volume, /health.")
+    Component(runner_py, "ADK Runner (runners.py)", "Python", "Manages Google ADK Context, States (7 state_delta keys), locks, and Agent execution.")
     
     Container_Boundary(tools_bound, "Tools Layer (tools/)") {
-        Component(tool_workouts, "workouts.py", "Python", "Logs workouts, fetches history, gets schedule.")
+        Component(tool_workouts, "workouts.py", "Python", "Logs workouts (returns workout_log_id), fetches history, gets schedule. NEW: generate_workout_plan, get_workout_plan, log_exercise_sets (PR detection + auto 1RM update), get_exercise_history, get_progressive_overload_summary. Science constants: VOLUME_TABLE, GOAL_REP_RANGES, SPLIT_MUSCLE_MAP (16 split types incl. Arnold Split).")
         Component(tool_nutrition, "nutrition.py", "Python", "Logs meals, fetches history, estimates macros.")
         Component(tool_bodycomp, "body_comp.py", "Python", "Logs weight/bf/hr, updates profile.")
         Component(tool_sleep, "sleep.py", "Python", "Logs sleep duration and stages.")
@@ -83,7 +83,7 @@ C4Component
         Component(tool_utils, "utils.py", "Python", "Database client, time logic, get_health_scores.")
     }
     
-    Component(context_svc, "Context Service (local_context.py)", "Python", "Fetches dynamic user data (profile, goals, notes, equipment) in parallel for the prompt.")
+    Component(context_svc, "Context Service (local_context.py)", "Python", "Fetches dynamic user data (profile, goals, notes, equipment, 1RM records, workout plan) in parallel (6 async fetchers) for the prompt.")
     Component(history_svc, "History Service (history_service.py)", "Python", "Manages dual-write chat/tool history and retrieval.")
   }
 
@@ -104,8 +104,8 @@ C4Component
   Rel(tools_bound, db, "Reads/Writes data via Supabase")
   Rel(tool_utils, edge_fn, "Invokes user-improvement-scorer via supabase functions invoke")
   Rel(history_svc, db, "Reads/Writes history")
-  Rel(context_svc, db, "Reads active profiles, notes, daily_goals, user_equipment")
-  Rel(main_py, db, "Reads/Writes profiles, 1RM records, and user equipment directly")
+  Rel(context_svc, db, "Reads active profiles, notes, daily_goals, user_equipment, user_1rm_records, workout_plan_exercises")
+  Rel(main_py, db, "Reads/Writes profiles, 1RM records, user equipment, workout plans, exercise logs, and muscle volume directly")
 ```
 
 ## 3. Internal Component Breakdown
@@ -117,14 +117,16 @@ C4Component
 - **`style.css`**: Provides the premium Google Glassmorphism UI styling.
 
 ### Backend Services (`nutrisync_adk/`)
-- **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/chat/feedback`, `/health`) and offline calculation of physiological formulas (Mifflin-St Jeor equation for macros/TDEE). Handles base64 data URI image decoding.
-- **Runners (`runners.py`)**: Responsible for connecting the FastAPI requests to the ADK Agent, managing asynchronous database sessions utilizing `DatabaseSessionService`, and applying per-user `asyncio.Lock` mechanisms to prevent race conditions during ADK state updates. Uses `state_delta` parameter in `run_async()` (rather than direct `session.state` mutation) to inject dynamic context (profile, daily totals, active notes, equipment list) into the ADK session state per the official ADK best practice for `DatabaseSessionService`.
-- **Agent Sandbox (`agents/coach.py`)**: Agent configuration mapping the `gemini-flash-latest` model and 16 distinct tools registered to the `coach_agent`.
-- **Context & History Services (`services/`)**: `local_context.py` loads `user_profile`, `daily_goals`, `persistent_context`, and `user_equipment` simultaneously via `asyncio.gather`. `history_service.py` manages chronological chat and tool history dual-writes.
-- **Tools (`tools/`)**: Modular python files encapsulating domain-specific logic. They use `get_current_functional_time()` in `utils.py` to correctly map late-night entries (e.g., 2 AM) to the functional prior calendar day. `charts.py` builds fully tailored Chart.js configurations and converts them to images via QuickChart.
+- **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/chat/feedback`, `/api/workout-plan/{user_id}`, `/api/progress/{user_id}`, `/api/muscle-volume/{user_id}`, `/health`) and offline calculation of physiological formulas (Mifflin-St Jeor equation for macros/TDEE). Handles base64 data URI image decoding. The 3 new workout endpoints query `workout_plan_exercises`, `exercise_logs`, and the `get_exercise_progress`/`get_weekly_muscle_volume` DB functions directly.
+- **Runners (`runners.py`)**: Responsible for connecting the FastAPI requests to the ADK Agent, managing asynchronous database sessions utilizing `DatabaseSessionService`, and applying per-user `asyncio.Lock` mechanisms to prevent race conditions during ADK state updates. Uses `state_delta` parameter in `run_async()` (rather than direct `session.state` mutation) to inject 7 dynamic context keys (user_profile, daily_totals, current_time, active_notes, equipment_list, one_rm_records, workout_plan) into the ADK session state per the official ADK best practice for `DatabaseSessionService`. The `_build_instruction` InstructionProvider callback substitutes all 7 `{placeholder}` tokens in the system prompt template.
+- **Agent Sandbox (`agents/coach.py`)**: Agent configuration mapping the `gemini-flash-latest` model and 21 distinct tools registered to the `coach_agent`. The 5 newest tools cover workout plan generation, set-level exercise logging with PR detection, exercise history retrieval, and progressive overload trend analysis.
+- **Context & History Services (`services/`)**: `local_context.py` loads `user_profile`, `daily_goals`, `persistent_context`, `user_equipment`, `user_1rm_records`, and `workout_plan_exercises` simultaneously via `asyncio.gather` (6 parallel fetchers). `history_service.py` manages chronological chat and tool history dual-writes.
+- **Tools (`tools/`)**: Modular python files encapsulating domain-specific logic. They use `get_current_functional_time()` in `utils.py` to correctly map late-night entries (e.g., 2 AM) to the functional prior calendar day. `charts.py` builds fully tailored Chart.js configurations and converts them to images via QuickChart. `workouts.py` contains science-based constants (`VOLUME_TABLE` with Schoenfeld dose-response volume landmarks per experience level, `GOAL_REP_RANGES` with load %1RM per goal, `SPLIT_MUSCLE_MAP` with 16 split types including Arnold Split) and implements structured superset support via `superset_group`.
 
 ### Database Layer (Supabase)
-- Uses **PostgreSQL** configured with **RLS (Row-Level Security)** enforcing isolated tenant access via JWT token exchange. Tables map tightly to backend fetching (e.g., `user_profile`, `daily_goals`, `user_1rm_records`, `workout_splits`, `persistent_context`, `user_equipment`).
+- Uses **PostgreSQL** configured with **RLS (Row-Level Security)** enforcing isolated tenant access via JWT token exchange. Tables map tightly to backend fetching (e.g., `user_profile`, `daily_goals`, `user_1rm_records`, `workout_splits`, `persistent_context`, `user_equipment`, `workout_plan_exercises`, `exercise_logs`).
+- **Workout Plan Tables** (new): `workout_plan_exercises` stores the AI-prescribed workout plan per split day (exercise name, type, target muscles, sets, rep range, load %1RM, rest, superset_group, notes). `exercise_logs` stores actual set-by-set performance (weight × reps × RPE, with auto-computed `volume_load` via GENERATED ALWAYS AS STORED column, `is_pr` flags, and optional FK to `workout_logs` via UUID). Both tables have full RLS + service_role policies and 7 optimized indexes.
+- **DB Helper Functions**: `estimated_1rm()` (Epley formula, IMMUTABLE), `get_exercise_progress()` (weekly e1RM/volume trends grouped by ISO week, STABLE), `get_weekly_muscle_volume()` (sets per muscle group via exercise_logs ↔ workout_plan_exercises join with UNNEST on target_muscles array, STABLE).
 - Connection pooling uses `asyncpg` with zero statement caching (`prepared_statement_cache_size=0`) to ensure compatibility with Supabase's `Supavisor` connection pooler.
 - **Edge Functions** execute intensive or cron-triggered logical operations separately (e.g. `user-improvement-scorer`), saving results to `scores_snapshots` and domain-specific `*_improvement_snapshots` tables.
 - **ADK Internals** manage Google ADK execution state via tables such as `sessions`, `app_states`, and `events`.

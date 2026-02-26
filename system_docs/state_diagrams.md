@@ -82,7 +82,7 @@ stateDiagram-v2
 ```
 
 ## 3. AI Agent Request State Machine
-Describes the backend state machine running within Google's Agent Development Kit (ADK) Runner (`runners.py`) for processing a single user message. Includes parallel context fetching and async locks.
+Describes the backend state machine running within Google's Agent Development Kit (ADK) Runner (`runners.py`) for processing a single user message. Includes 6 parallel context fetchers, 7 state_delta keys, and async locks.
 
 ```mermaid
 stateDiagram-v2
@@ -96,26 +96,38 @@ stateDiagram-v2
      [*] --> FetchDailyGoals
      [*] --> FetchPersistentContext
      [*] --> FetchUserEquipment
+     [*] --> Fetch1RMRecords
+     [*] --> FetchWorkoutPlan
      FetchProfile --> MergeContext
      FetchDailyGoals --> MergeContext
      FetchPersistentContext --> MergeContext
      FetchUserEquipment --> MergeContext
+     Fetch1RMRecords --> MergeContext
+     FetchWorkoutPlan --> MergeContext
   }
   
-  MergeContext --> SessionUpdate : Apply state_delta via run_async() (ADK event-based state persistence)
-  SessionUpdate --> UserMessageLogged : Dual-write User Message to `chat_history`
+  MergeContext --> SessionUpdate : Apply state_delta (7 keys) via run_async()
+  
+  note right of SessionUpdate
+    Keys: user_profile, daily_totals,
+    current_time, active_notes,
+    equipment_list, one_rm_records,
+    workout_plan
+  end note
+  
+  SessionUpdate --> UserMessageLogged : Dual-write User Message to chat_history
   
   UserMessageLogged --> AgentExecution : Dispatch streaming async event generator
   
   state AgentExecution {
     [*] --> GeneratingContent
     GeneratingContent --> ToolCallRequested : LLM decides it needs data
-    ToolCallRequested --> ExecutingTool : Runner calls Python Tool (e.g., workouts.py logs entry)
+    ToolCallRequested --> ExecutingTool : Runner calls Python Tool (1 of 21 tools)
     ExecutingTool --> GeneratingContent : Return tool json result back to LLM context
     GeneratingContent --> FinalResponseReady : event.is_final_response() == True
   }
 
-  AgentExecution --> HistorySaving : Dual-write Model Response to `chat_history`
+  AgentExecution --> HistorySaving : Dual-write Model Response to chat_history
   
   HistorySaving --> ReturnToFrontend : Release Lock, Return text/chart and message_id
   ReturnToFrontend --> [*] : HTTP 200 OK
@@ -213,4 +225,156 @@ stateDiagram-v2
   WriteSnapshots --> ReturnToAgent : Save to `scores_snapshots` and domain improvement tables
 
   ReturnToAgent --> [*] : JSON result injected into Agent context
+```
+
+## 8. AI Workout Plan Generation Flow
+Describes the state machine when the AI agent generates a structured workout plan. The agent selects exercises based on user context (profile, equipment, 1RM, split) and calls `generate_workout_plan` to persist the plan.
+
+```mermaid
+stateDiagram-v2
+  [*] --> TriggerDetected
+
+  TriggerDetected --> ContextGathered : Agent reads session state (profile, equipment, 1RM, active split)
+  
+  state ExerciseSelection {
+    [*] --> IterateSplitDays : For each day in active split
+    
+    IterateSplitDays --> LookupMuscles : Map day name via SPLIT_MUSCLE_MAP (16 types)
+    LookupMuscles --> SelectCompounds : Compounds FIRST (multi-joint)
+    SelectCompounds --> SelectIsolations : Fill volume gaps with isolations
+    SelectIsolations --> FilterByEquipment : Only exercises user can do with their equipment
+    FilterByEquipment --> SetVolume : Apply Schoenfeld volume (MEV/MAV/MRV by experience)
+    SetVolume --> SetRepRange : Apply goal-based rep range + load %1RM
+    SetRepRange --> AssignSupersets : Group antagonist pairs (superset_group) if Arnold Split
+    AssignSupersets --> SetRestPeriods : 120-180s compounds, 60-90s isolations
+    SetRestPeriods --> IterateSplitDays : Next day
+    SetRestPeriods --> BuildJSON : All days complete
+  }
+  
+  ContextGathered --> ExerciseSelection
+  
+  BuildJSON --> CallTool : generate_workout_plan(exercises_json)
+  
+  state PersistPlan {
+    [*] --> FetchActiveSplit : Get active split_id
+    FetchActiveSplit --> DeleteOldPlan : Remove existing plan for this split
+    DeleteOldPlan --> ValidateFields : Check 8 required fields per exercise
+    ValidateFields --> BatchInsert : Insert all rows to workout_plan_exercises
+    BatchInsert --> [*] : Return summary (exercises per day)
+  }
+
+  CallTool --> PersistPlan
+  PersistPlan --> DisplayPlan : Agent presents plan to user
+  DisplayPlan --> [*]
+```
+
+## 9. Set-Level Exercise Logging & PR Detection Flow
+Describes the state machine when a user reports what they actually did in a workout. Includes the dual-tool workflow (session-level `log_workout` → set-level `log_exercise_sets`), PR detection, and auto 1RM updates.
+
+```mermaid
+stateDiagram-v2
+  [*] --> UserReportsWorkout : "I did bench press 80kg for 10, 9, 8"
+
+  UserReportsWorkout --> LogSession : Agent calls log_workout(type, duration, calories)
+  LogSession --> CaptureSessionId : Returns workout_log_id (UUID)
+  
+  CaptureSessionId --> LogExerciseSets : For each exercise reported
+  
+  state LogExerciseSets {
+    [*] --> ParseSetsJSON : Parse [{weight_kg, reps, rpe?, is_warmup?, notes?}]
+    ParseSetsJSON --> FetchExistingPRs : Query best volume_load + best weight_kg from exercise_logs
+    
+    FetchExistingPRs --> ProcessEachSet : Iterate sets
+    
+    state ProcessEachSet {
+      [*] --> CheckWarmup
+      CheckWarmup --> SkipPR : is_warmup = true
+      CheckWarmup --> CheckVolumePR : is_warmup = false (working set)
+      
+      CheckVolumePR --> FlagVolumePR : weight × reps > existing best volume
+      CheckVolumePR --> CheckWeightPR : Not a volume PR
+      CheckWeightPR --> FlagWeightPR : weight > existing best weight
+      CheckWeightPR --> NoNewPR : Not a weight PR either
+      
+      FlagVolumePR --> AccumulateStats
+      FlagWeightPR --> AccumulateStats
+      NoNewPR --> AccumulateStats
+      SkipPR --> AccumulateStats
+      AccumulateStats --> [*] : Next set
+    }
+    
+    ProcessEachSet --> BatchInsertSets : Insert all rows to exercise_logs (linked via workout_log_id)
+    BatchInsertSets --> Check1RM : Any 1-rep max working sets?
+    Check1RM --> AutoUpdate1RM : Yes — _try_update_1rm (case-insensitive canonical upsert)
+    Check1RM --> BuildResponse : No
+    AutoUpdate1RM --> BuildResponse
+    BuildResponse --> [*] : Return volume summary + PR flags
+  }
+  
+  LogExerciseSets --> CompareHistory : Agent calls get_exercise_history for comparison
+  CompareHistory --> CelebratePRs : Any PRs? Celebrate!
+  CompareHistory --> ReportTrend : Show improvement/regression vs last session
+  CelebratePRs --> [*]
+  ReportTrend --> [*]
+```
+
+## 10. Progressive Overload Query Flow
+Describes the two query modes for progressive overload analysis: single-exercise (uses DB function) and all-exercises (in-code aggregation).
+
+```mermaid
+stateDiagram-v2
+  [*] --> QueryRequested : User asks "Am I getting stronger?"
+
+  QueryRequested --> CheckMode : get_progressive_overload_summary(exercise_name?, weeks)
+  
+  CheckMode --> SingleExerciseMode : exercise_name provided
+  CheckMode --> AllExercisesMode : exercise_name omitted
+  
+  state SingleExerciseMode {
+    [*] --> CallRPC : get_exercise_progress(user_id, exercise, weeks)
+    CallRPC --> WeeklyTrend : Returns weekly e1RM, volume, sets, PRs
+    WeeklyTrend --> FetchAllTimePRs : Best weight, best volume_load, best e1RM
+    FetchAllTimePRs --> FetchRecentSession : Latest dated sets for this exercise
+    FetchRecentSession --> [*] : Return {exercise, weekly_trend, all_time_pr, pr_history, recent_session}
+  }
+  
+  state AllExercisesMode {
+    [*] --> QueryRecentLogs : exercise_logs WHERE log_date >= cutoff (limit 500)
+    QueryRecentLogs --> GroupByExercise : Aggregate per exercise name
+    GroupByExercise --> [*] : Return {exercises: [{total_sets, total_volume, best_weight, pr_count, last_date}]}
+  }
+  
+  SingleExerciseMode --> VisualizeData : Agent calls draw_chart (e1RM trend line, neon palette)
+  AllExercisesMode --> ReportSummary : Agent presents table of all exercises
+  
+  VisualizeData --> [*]
+  ReportSummary --> [*]
+```
+
+## 11. Muscle Volume Heatmap Query Flow
+Describes how the weekly muscle volume data is computed by joining exercise logs with the workout plan to map exercises → target muscles.
+
+```mermaid
+stateDiagram-v2
+  [*] --> QueryRequested : GET /api/muscle-volume/{user_id}?week_offset=0
+
+  QueryRequested --> CallRPC : get_weekly_muscle_volume(user_id, week_offset)
+  
+  state DBFunction {
+    [*] --> CalculateWeekWindow : week_start = date_trunc(CURRENT_DATE + offset)
+    CalculateWeekWindow --> JoinTables : exercise_logs INNER JOIN workout_plan_exercises
+    
+    note right of JoinTables
+      Join ON user_id + LOWER(exercise_name)
+      Filter: is_warmup = false, log_date in week window
+    end note
+    
+    JoinTables --> UnnestMuscles : UNNEST(wpe.target_muscles) as muscle_group
+    UnnestMuscles --> CountSets : GROUP BY muscle_group, COUNT(exercise_log.id)
+    CountSets --> [*] : Return [{muscle_group, completed_sets}]
+  }
+  
+  CallRPC --> DBFunction
+  DBFunction --> ReturnResponse : {week_offset, muscle_volumes: [...]}
+  ReturnResponse --> [*]
 ```
