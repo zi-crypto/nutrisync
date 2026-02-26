@@ -349,6 +349,144 @@ async def update_profile(request: ProfileRequest):
         logger.error(f"Error updating profile: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ── Workout Plan & Progress API (Phase 4) ──────────────────────────────────
+
+@app.get("/api/workout-plan/{user_id}")
+async def get_workout_plan(user_id: str):
+    """Returns the user's current AI-generated workout plan grouped by day."""
+    try:
+        # Get active split
+        split_resp = (runner.supabase.table("workout_splits")
+                      .select("id, name")
+                      .eq("user_id", user_id)
+                      .eq("is_active", True)
+                      .limit(1)
+                      .execute())
+        if not split_resp.data:
+            return {"plan": [], "split_name": None, "message": "No active split found."}
+
+        split_id = split_resp.data[0]["id"]
+        split_name = split_resp.data[0]["name"]
+
+        plan_resp = (runner.supabase.table("workout_plan_exercises")
+                     .select("split_day_name, exercise_order, exercise_name, exercise_type, "
+                             "target_muscles, sets, rep_range_low, rep_range_high, "
+                             "load_percentage, rest_seconds, superset_group, notes")
+                     .eq("user_id", user_id)
+                     .eq("split_id", split_id)
+                     .order("split_day_name")
+                     .order("exercise_order")
+                     .execute())
+
+        return {"split_name": split_name, "plan": plan_resp.data or []}
+    except Exception as e:
+        logger.error(f"Error fetching workout plan: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/progress/{user_id}")
+async def get_progress(user_id: str, exercise: Optional[str] = None, weeks: int = 8):
+    """Returns progressive overload data for one exercise or all exercises."""
+    try:
+        if exercise:
+            # Weekly trend via DB function
+            progress_resp = runner.supabase.rpc("get_exercise_progress", {
+                "p_user_id": user_id,
+                "p_exercise_name": exercise,
+                "p_weeks": weeks,
+            }).execute()
+
+            # All-time best weight
+            best_weight_resp = (runner.supabase.table("exercise_logs")
+                                .select("weight_kg, reps, volume_load, log_date")
+                                .eq("user_id", user_id)
+                                .ilike("exercise_name", exercise)
+                                .eq("is_warmup", False)
+                                .order("weight_kg", desc=True)
+                                .limit(1)
+                                .execute())
+
+            # All-time best volume set
+            best_vol_resp = (runner.supabase.table("exercise_logs")
+                             .select("weight_kg, reps, volume_load, log_date")
+                             .eq("user_id", user_id)
+                             .ilike("exercise_name", exercise)
+                             .eq("is_warmup", False)
+                             .order("volume_load", desc=True)
+                             .limit(1)
+                             .execute())
+
+            best_weight = best_weight_resp.data[0] if best_weight_resp.data else None
+            best_e1rm = None
+            if best_weight:
+                w, r = best_weight["weight_kg"], best_weight["reps"]
+                best_e1rm = round(w * (1 + r / 30.0), 1) if r > 0 else w
+
+            return {
+                "exercise": exercise,
+                "weekly_trend": progress_resp.data or [],
+                "all_time_pr": {
+                    "best_weight": best_weight,
+                    "best_volume_set": best_vol_resp.data[0] if best_vol_resp.data else None,
+                    "best_e1rm": best_e1rm,
+                },
+            }
+        else:
+            # Summary for all exercises
+            from datetime import datetime, timedelta
+            cutoff = (datetime.utcnow() - timedelta(weeks=weeks)).strftime('%Y-%m-%d')
+
+            all_resp = (runner.supabase.table("exercise_logs")
+                        .select("exercise_name, weight_kg, reps, volume_load, is_pr, log_date")
+                        .eq("user_id", user_id)
+                        .eq("is_warmup", False)
+                        .gte("log_date", cutoff)
+                        .order("log_date", desc=True)
+                        .limit(500)
+                        .execute())
+
+            if not all_resp.data:
+                return {"exercises": [], "message": "No exercise data yet."}
+
+            exercise_map = {}
+            for row in all_resp.data:
+                name = row["exercise_name"]
+                if name not in exercise_map:
+                    exercise_map[name] = {
+                        "total_sets": 0, "total_volume": 0,
+                        "best_weight": 0, "best_volume_set": 0,
+                        "pr_count": 0, "last_date": row["log_date"],
+                    }
+                entry = exercise_map[name]
+                entry["total_sets"] += 1
+                entry["total_volume"] += (row["volume_load"] or 0)
+                entry["best_weight"] = max(entry["best_weight"], row["weight_kg"])
+                entry["best_volume_set"] = max(entry["best_volume_set"], row["volume_load"] or 0)
+                if row.get("is_pr"):
+                    entry["pr_count"] += 1
+
+            exercises = [{"exercise": name, **data} for name, data in exercise_map.items()]
+            return {"exercises": exercises, "total_tracked": len(exercises)}
+    except Exception as e:
+        logger.error(f"Error fetching progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/muscle-volume/{user_id}")
+async def get_muscle_volume(user_id: str, week_offset: int = 0):
+    """Returns weekly completed sets per muscle group for the given week."""
+    try:
+        resp = runner.supabase.rpc("get_weekly_muscle_volume", {
+            "p_user_id": user_id,
+            "p_week_offset": week_offset,
+        }).execute()
+
+        return {"week_offset": week_offset, "muscle_volumes": resp.data or []}
+    except Exception as e:
+        logger.error(f"Error fetching muscle volume: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Serve Static Files (Frontend)
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse

@@ -823,6 +823,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         "Bro Split": ["Chest", "Back", "Legs", "Shoulders", "Arms", "Rest", "Rest"],
         "Upper Lower": ["Upper", "Lower", "Rest", "Upper", "Lower", "Rest", "Rest"],
         "Full Body": ["Full Body A", "Rest", "Full Body B", "Rest", "Full Body A", "Rest", "Rest"],
+        "Arnold Split": ["Chest & Back", "Shoulders & Arms", "Legs", "Chest & Back", "Shoulders & Arms", "Legs", "Rest"],
+        "PPL x2": ["Push", "Pull", "Legs", "Push", "Pull", "Legs", "Rest"],
         "Custom": ["Day 1"]
     };
 

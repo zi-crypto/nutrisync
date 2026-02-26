@@ -3,7 +3,11 @@ from google.adk.agents import Agent
 from google.adk.tools import google_search
 from google.genai import types
 from ..tools.nutrition import log_meal, get_nutrition_history, calculate_macros
-from ..tools.workouts import log_workout, get_workout_history, get_next_scheduled_workout
+from ..tools.workouts import (
+    log_workout, get_workout_history, get_next_scheduled_workout,
+    generate_workout_plan, get_workout_plan, log_exercise_sets,
+    get_exercise_history, get_progressive_overload_summary,
+)
 from ..tools.sleep import log_sleep, get_sleep_history
 from ..tools.body_comp import log_body_comp, get_body_comp_history
 from ..tools.context_notes import set_status_note, clear_status_note, get_active_notes_tool
@@ -37,6 +41,12 @@ coach_agent = Agent(
         get_active_notes_tool,
         draw_chart,
         web_search,
+        # Workout Planning & Progressive Overload tools
+        generate_workout_plan,
+        get_workout_plan,
+        log_exercise_sets,
+        get_exercise_history,
+        get_progressive_overload_summary,
     ],
-    description="Main coach agent handling nutrition, workout, sleep, body comp, context notes logic, and up-to-date internet searches."
+    description="Main coach agent handling nutrition, workout planning, set-level exercise logging, progressive overload tracking, sleep, body comp, context notes logic, and up-to-date internet searches."
 )
