@@ -111,10 +111,10 @@ C4Component
 ## 3. Internal Component Breakdown
 
 ### Frontend (Static Files in `nutrisync_adk/static/`)
-- **`index.html`**: The single HTML shell, managing layout overlays (Auth, Chat View, Onboarding Wizard, Live Coach).
-- **`script.js`**: Controls UI state transitions, API network calls to FastAPI, markdown rendering (KaTeX + Marked), IndexedDB local caching (`ChatCache`), message feedback UI, and Supabase Auth session management.
+- **`index.html`**: The single HTML shell, managing layout overlays (Auth, Chat View, Onboarding Wizard, Live Coach, Workout Tracker).
+- **`script.js`**: Controls UI state transitions, API network calls to FastAPI, markdown rendering (KaTeX + Marked), IndexedDB local caching (`ChatCache`), message feedback UI, Supabase Auth session management, and the `WorkoutTracker` frontend module (Plan tab grouping, Progress tab charts via Chart.js, Volume Heatmap tab).
 - **`workout_coach.js`**: Integrates `MediaPipe/pose` library via camera stream to track angles and repetititons locally. Implements SOLID principles via `CameraManager`, `PoseEstimationService`, `UIRenderer`, `ExerciseEngine`, and specific profiles (`SquatProfile`, `PushupProfile`, `PullProfile`). Features dynamic range calibration and cross-contamination filtering.
-- **`style.css`**: Provides the premium Google Glassmorphism UI styling.
+- **`style.css`**: Provides the premium Google Glassmorphism UI styling, including specialized styling for the Workout Tracker tabs, exercise cards, and progress bars.
 
 ### Backend Services (`nutrisync_adk/`)
 - **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/chat/feedback`, `/api/workout-plan/{user_id}`, `/api/progress/{user_id}`, `/api/muscle-volume/{user_id}`, `/health`) and offline calculation of physiological formulas (Mifflin-St Jeor equation for macros/TDEE). Handles base64 data URI image decoding. The 3 new workout endpoints query `workout_plan_exercises`, `exercise_logs`, and the `get_exercise_progress`/`get_weekly_muscle_volume` DB functions directly.

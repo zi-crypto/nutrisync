@@ -39,7 +39,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 
 ### 2.4 Operating Environment
 - **Backend**: Python 3 (FastAPI) utilizing google-adk runners and asyncpg.
-- **Frontend**: Modern Web Browser (supports WebRTC/Camera for MediaPipe, Canvas API, IndexedDB for caching). Must support SpeechSynthesis API for voice feedback.
+- **Frontend**: Modern Web Browser (supports WebRTC/Camera for MediaPipe, Canvas API, IndexedDB for caching, Chart.js for data visualization). Must support SpeechSynthesis API for voice feedback.
 - **Database**: Supabase PostgreSQL with PostgREST and Edge Functions.
 - **LLM**: Google GenAI (`gemini-flash-latest`).
 
@@ -134,9 +134,14 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - **Tool**: `log_exercise_sets(exercise_name, sets_json, workout_log_id?)` — `workout_log_id` is Optional (UUID string) allowing standalone logging without a parent session.
 
 ### FR-WORKOUT-03: Progressive Overload Tracking
-- **Description**: The system provides data-driven progressive overload analysis for individual exercises and across all exercises.
+### FR-WORKOUT-03: Progressive Overload Tracking
+- **Description**: The system provides data-driven progressive overload analysis for individual exercises and across all exercises via a standalone `WorkoutTracker` UI and AI tools.
 - **Implementation**:
-  - System prompt Protocol #13 defines when to use and what to report.
+  - System prompt Protocol #13 defines when to use and what to report contextually in chat.
+  - **Frontend UI (`WorkoutTracker` overlay)**: Provides three persistent tabs:
+    - **Plan Tab**: Displays the parsed, active split workout plan grouped by day tabs. Renders superset badges and calculated total sets per muscle group.
+    - **Progress Tab**: Uses `Chart.js` to render Estimated 1RM Trends and Volume Load Trends. Shows session history pills and all-time PR badges. Populates a dropdown to filter by specific exercises.
+    - **Volume Tab**: Renders a Weekly Muscle Volume Heatmap with progress bars, comparing completed sets against weekly targets derived from the user's experience level (e.g. 16 sets/week for chest, 12 for triceps). Allows navigation back in time week-by-week.
   - **Single Exercise Mode**: Calls `get_exercise_progress` DB function for weekly e1RM trends (Epley: `weight × (1 + reps/30)`), volume trends, total sets, best weight/reps per week, and PR flags grouped by ISO week.
   - **All Exercises Mode**: In-code aggregation from recent exercise logs (limit 500 rows) returning per-exercise totals, bests, and PR counts.
   - **Muscle Volume**: `get_weekly_muscle_volume` DB function joins exercise_logs ↔ workout_plan_exercises via `UNNEST(target_muscles)`, returns completed sets per muscle group per week.

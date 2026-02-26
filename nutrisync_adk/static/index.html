@@ -34,6 +34,14 @@
             <div class="logo">NutriSync</div>
             <div class="status">Online</div>
             <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
+                <button id="workout-tracker-toggle-btn" class="icon-btn hidden" title="Workout Tracker">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 20V10"></path>
+                        <path d="M12 20V4"></path>
+                        <path d="M6 20v-6"></path>
+                    </svg>
+                </button>
                 <button id="live-coach-toggle-btn" class="icon-btn hidden" title="Live Coach">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -149,6 +157,118 @@
             <div class="wizard-footer" style="justify-content: center; margin-top: 20px;">
                 <button type="button" id="start-coach-btn">Start Tracking</button>
                 <button type="button" id="stop-coach-btn" class="secondary-btn hidden">Stop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workout Tracker Overlay -->
+    <div id="workout-tracker-overlay" class="auth-overlay hidden">
+        <div class="auth-box wizard-box wt-overlay-box">
+            <button id="close-tracker-btn" class="icon-btn wt-close-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <!-- Tab Bar -->
+            <div class="wt-tab-bar">
+                <button class="wt-tab active" data-tab="plan">📋 Plan</button>
+                <button class="wt-tab" data-tab="progress">📈 Progress</button>
+                <button class="wt-tab" data-tab="volume">🔥 Volume</button>
+            </div>
+
+            <!-- ═══════════════════ TAB 1: PLAN VIEW ═══════════════════ -->
+            <div class="wt-tab-content active" id="wt-plan-tab">
+                <div class="wt-plan-header">
+                    <h2 class="wt-section-title">📋 My Workout Plan</h2>
+                    <button id="wt-regenerate-btn" class="secondary-btn wt-regen-btn" title="Ask AI to regenerate plan">🔄 Regenerate Plan</button>
+                </div>
+
+                <!-- Split Day Tabs -->
+                <div id="wt-day-tabs" class="wt-day-tabs">
+                    <!-- Dynamically populated -->
+                </div>
+
+                <!-- Exercise List -->
+                <div id="wt-exercise-list" class="wt-exercise-list">
+                    <div class="wt-empty-state">
+                        <p>No workout plan yet.</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">Ask the AI coach to generate a plan for you, or click Regenerate Plan.</p>
+                    </div>
+                </div>
+
+                <!-- Volume Summary -->
+                <div id="wt-volume-summary" class="wt-volume-summary" style="display:none;"></div>
+            </div>
+
+            <!-- ═══════════════════ TAB 2: PROGRESS VIEW ═══════════════════ -->
+            <div class="wt-tab-content" id="wt-progress-tab">
+                <div class="wt-progress-header">
+                    <h2 class="wt-section-title">📈 Progressive Overload Tracker</h2>
+                    <select id="wt-progress-weeks" class="form-select wt-small-select">
+                        <option value="4">4 weeks</option>
+                        <option value="8" selected>8 weeks</option>
+                        <option value="12">12 weeks</option>
+                        <option value="24">24 weeks</option>
+                    </select>
+                </div>
+
+                <div class="wt-exercise-filter">
+                    <label>Exercise:</label>
+                    <select id="wt-exercise-select" class="form-select wt-exercise-dropdown">
+                        <option value="">All Exercises</option>
+                    </select>
+                </div>
+
+                <!-- Single Exercise View -->
+                <div id="wt-single-exercise-view" style="display:none;">
+                    <div class="wt-chart-card">
+                        <h3 class="wt-chart-title">Estimated 1RM Trend</h3>
+                        <canvas id="wt-e1rm-chart" height="200"></canvas>
+                    </div>
+                    <div class="wt-chart-card">
+                        <h3 class="wt-chart-title">Volume Load Trend</h3>
+                        <canvas id="wt-volume-chart" height="200"></canvas>
+                    </div>
+                    <div id="wt-session-history" class="wt-session-history"></div>
+                    <div id="wt-pr-records" class="wt-pr-records"></div>
+                </div>
+
+                <!-- All Exercises View -->
+                <div id="wt-all-exercises-view">
+                    <div id="wt-all-exercises-list" class="wt-all-exercises-list">
+                        <div class="wt-empty-state">
+                            <p>No exercise data yet.</p>
+                            <p style="color:#8b949e;font-size:0.85rem;">Start logging sets via the AI coach to see your progress.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════════ TAB 3: VOLUME HEATMAP ═══════════════════ -->
+            <div class="wt-tab-content" id="wt-volume-tab">
+                <div class="wt-volume-header">
+                    <h2 class="wt-section-title">🔥 Weekly Muscle Volume</h2>
+                    <div class="wt-week-nav">
+                        <button id="wt-week-prev" class="wt-week-btn">◀</button>
+                        <span id="wt-week-label">This Week</span>
+                        <button id="wt-week-next" class="wt-week-btn">▶</button>
+                    </div>
+                </div>
+
+                <div id="wt-muscle-bars" class="wt-muscle-bars">
+                    <div class="wt-empty-state">
+                        <p>No volume data yet.</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">Log exercise sets to see your weekly muscle volume.</p>
+                    </div>
+                </div>
+
+                <div class="wt-volume-legend">
+                    <span class="wt-legend-item"><span class="wt-legend-swatch wt-legend-done"></span> Done</span>
+                    <span class="wt-legend-item"><span class="wt-legend-swatch wt-legend-remaining"></span> Remaining</span>
+                    <span class="wt-legend-info">Target based on experience level + goal</span>
+                </div>
             </div>
         </div>
     </div>

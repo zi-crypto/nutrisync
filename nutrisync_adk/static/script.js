@@ -1681,7 +1681,716 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (liveCoachToggleBtn) liveCoachToggleBtn.classList.add('hidden');
                 // Also hide onboarding if user logs out mid-wizard
                 onboardingOverlay.classList.add('hidden');
+                // Hide workout tracker on logout
+                const wtOverlay = document.getElementById('workout-tracker-overlay');
+                if (wtOverlay) wtOverlay.classList.add('hidden');
             }
         }
     });
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WORKOUT TRACKER MODULE
+    // ═══════════════════════════════════════════════════════════════════════════
+    const workoutTrackerToggleBtn = document.getElementById('workout-tracker-toggle-btn');
+    const workoutTrackerOverlay = document.getElementById('workout-tracker-overlay');
+    const closeTrackerBtn = document.getElementById('close-tracker-btn');
+
+    class WorkoutTracker {
+        constructor() {
+            this.userId = null;
+            this.planData = null;       // { split_name, plan: [...] }
+            this.currentDay = null;     // active split day tab name
+            this.progressData = null;   // cached per-exercise progress
+            this.allProgressData = null; // cached all-exercises summary
+            this.muscleVolumeData = null;
+            this.weekOffset = 0;
+            this.e1rmChart = null;      // Chart.js instance
+            this.volumeChart = null;    // Chart.js instance
+            this.exerciseHistory = {};  // cache: { exerciseName: [...sets] }
+
+            this._bindTabs();
+            this._bindPlanControls();
+            this._bindProgressControls();
+            this._bindVolumeControls();
+        }
+
+        setUserId(id) {
+            this.userId = id;
+        }
+
+        // ── Tab Navigation ──────────────────────────────────────────────────
+        _bindTabs() {
+            document.querySelectorAll('.wt-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.wt-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.wt-tab-content').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    const target = tab.getAttribute('data-tab');
+                    document.getElementById(`wt-${target}-tab`).classList.add('active');
+                    // Lazy-load data on tab switch
+                    if (target === 'plan') this.loadPlan();
+                    if (target === 'progress') this.loadProgress();
+                    if (target === 'volume') this.loadMuscleVolume();
+                });
+            });
+        }
+
+        // ═══════════════════ PLAN TAB ═══════════════════
+
+        _bindPlanControls() {
+            const regenBtn = document.getElementById('wt-regenerate-btn');
+            if (regenBtn) {
+                regenBtn.addEventListener('click', () => {
+                    // Send a message to the AI coach asking to regenerate
+                    if (window.app && window.app.userId) {
+                        workoutTrackerOverlay.classList.add('hidden');
+                        const input = document.getElementById('user-input');
+                        if (input) {
+                            input.value = 'Please regenerate my workout plan for all split days based on my current profile, equipment, and 1RM records.';
+                            window.app.sendMessage();
+                        }
+                    }
+                });
+            }
+        }
+
+        async loadPlan() {
+            if (!this.userId) return;
+            try {
+                const res = await fetch(`/api/workout-plan/${this.userId}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                this.planData = await res.json();
+                this._renderDayTabs();
+            } catch (e) {
+                console.error('WorkoutTracker: loadPlan failed', e);
+            }
+        }
+
+        _renderDayTabs() {
+            const tabsContainer = document.getElementById('wt-day-tabs');
+            tabsContainer.innerHTML = '';
+
+            if (!this.planData || !this.planData.plan || this.planData.plan.length === 0) {
+                document.getElementById('wt-exercise-list').innerHTML = `
+                    <div class="wt-empty-state">
+                        <p>No workout plan yet.</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">Ask the AI coach to generate a plan for you, or click Regenerate Plan.</p>
+                    </div>`;
+                document.getElementById('wt-volume-summary').style.display = 'none';
+                return;
+            }
+
+            // Extract unique day names preserving order
+            const days = [];
+            const seen = new Set();
+            this.planData.plan.forEach(ex => {
+                if (!seen.has(ex.split_day_name)) {
+                    seen.add(ex.split_day_name);
+                    days.push(ex.split_day_name);
+                }
+            });
+
+            days.forEach((day, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'wt-day-tab' + (idx === 0 ? ' active' : '');
+                btn.textContent = day;
+                btn.addEventListener('click', () => {
+                    tabsContainer.querySelectorAll('.wt-day-tab').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    this.currentDay = day;
+                    this._renderExercises(day);
+                });
+                tabsContainer.appendChild(btn);
+            });
+
+            this.currentDay = days[0];
+            this._renderExercises(days[0]);
+        }
+
+        _renderExercises(dayName) {
+            const list = document.getElementById('wt-exercise-list');
+            const summaryEl = document.getElementById('wt-volume-summary');
+            const exercises = this.planData.plan.filter(e => e.split_day_name === dayName);
+
+            if (exercises.length === 0) {
+                list.innerHTML = '<div class="wt-empty-state"><p>No exercises for this day.</p></div>';
+                summaryEl.style.display = 'none';
+                return;
+            }
+
+            list.innerHTML = '';
+            const muscleSetCount = {};  // Muscle → total sets
+
+            // Group by superset_group
+            let currentSuperset = null;
+
+            exercises.forEach(ex => {
+                const card = document.createElement('div');
+                card.className = 'wt-exercise-card';
+                card.setAttribute('data-exercise', ex.exercise_name);
+
+                const isCompound = (ex.exercise_type || '').toLowerCase() === 'compound';
+                const typeLabel = isCompound ? '🏋️ Compound' : '🎯 Isolation';
+                const typeClass = isCompound ? 'wt-ex-type-compound' : 'wt-ex-type-isolation';
+
+                const muscles = (ex.target_muscles || []).join(', ');
+                const repRange = `${ex.sets}×${ex.rep_range_low}-${ex.rep_range_high}`;
+                const loadText = ex.load_percentage ? ` @ ${Math.round(ex.load_percentage * 100)}% 1RM` : '';
+                const restText = ex.rest_seconds ? `Rest: ${ex.rest_seconds >= 120 ? (ex.rest_seconds / 60) + ' min' : ex.rest_seconds + 's'}` : '';
+
+                // Superset badge
+                let supersetHtml = '';
+                if (ex.superset_group != null) {
+                    supersetHtml = `<span class="wt-superset-badge">🔗 Superset ${ex.superset_group}</span>`;
+                }
+
+                card.innerHTML = `
+                    <div class="wt-ex-top-row">
+                        <span class="wt-ex-order">${ex.exercise_order}</span>
+                        <span class="wt-ex-name">${ex.exercise_name}</span>
+                        <span class="wt-ex-type-badge ${typeClass}">${typeLabel}</span>
+                    </div>
+                    <div class="wt-ex-detail-row">
+                        <span class="wt-ex-detail"><strong>${repRange}</strong>${loadText}</span>
+                        ${restText ? `<span class="wt-ex-detail">${restText}</span>` : ''}
+                        ${supersetHtml}
+                    </div>
+                    <div class="wt-ex-muscles">Muscles: <span>${muscles}</span></div>
+                    ${ex.notes ? `<div class="wt-ex-detail" style="margin-top:4px;font-size:0.8rem;color:rgba(255,255,255,0.4);">📝 ${ex.notes}</div>` : ''}
+                    <div class="wt-ex-ghost">
+                        <div class="wt-ex-ghost-title">Last Session</div>
+                        <div class="wt-ex-ghost-sets" data-exercise-ghost="${ex.exercise_name}">Loading...</div>
+                    </div>
+                `;
+
+                // Tap to expand (show ghost data / previous session)
+                card.addEventListener('click', () => {
+                    const wasExpanded = card.classList.contains('expanded');
+                    // Collapse all
+                    list.querySelectorAll('.wt-exercise-card').forEach(c => c.classList.remove('expanded'));
+                    if (!wasExpanded) {
+                        card.classList.add('expanded');
+                        this._loadGhostData(ex.exercise_name, card.querySelector(`[data-exercise-ghost="${ex.exercise_name}"]`));
+                    }
+                });
+
+                list.appendChild(card);
+
+                // Count volume
+                (ex.target_muscles || []).forEach(m => {
+                    const normalize = m.replace(/_/g, ' ').trim();
+                    muscleSetCount[normalize] = (muscleSetCount[normalize] || 0) + (ex.sets || 0);
+                });
+            });
+
+            // Volume summary
+            if (Object.keys(muscleSetCount).length > 0) {
+                const parts = Object.entries(muscleSetCount)
+                    .map(([m, s]) => `<strong>${this._capitalize(m)}</strong> ${s} sets`)
+                    .join(' &nbsp;|&nbsp; ');
+                summaryEl.innerHTML = `📊 Volume Summary: ${parts}`;
+                summaryEl.style.display = 'block';
+            } else {
+                summaryEl.style.display = 'none';
+            }
+        }
+
+        async _loadGhostData(exerciseName, el) {
+            if (!this.userId || !el) return;
+            // Check cache
+            if (this.exerciseHistory[exerciseName]) {
+                this._renderGhostSets(this.exerciseHistory[exerciseName], el);
+                return;
+            }
+            try {
+                const res = await fetch(`/api/progress/${this.userId}?exercise=${encodeURIComponent(exerciseName)}&weeks=4`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                // Pick the latest week's data from weekly_trend
+                if (data.weekly_trend && data.weekly_trend.length > 0) {
+                    this.exerciseHistory[exerciseName] = data;
+                    this._renderGhostSets(data, el);
+                } else {
+                    el.textContent = 'No previous session data.';
+                }
+            } catch (e) {
+                el.textContent = 'Could not load history.';
+                console.error('Ghost load error:', e);
+            }
+        }
+
+        _renderGhostSets(data, el) {
+            if (!data || !data.weekly_trend || data.weekly_trend.length === 0) {
+                el.textContent = 'No previous session data.';
+                return;
+            }
+            const latest = data.weekly_trend[data.weekly_trend.length - 1];
+            const parts = [];
+            if (latest.best_weight) parts.push(`Best: ${latest.best_weight}kg`);
+            if (latest.best_reps) parts.push(`× ${latest.best_reps} reps`);
+            if (latest.total_volume) parts.push(`Vol: ${Math.round(latest.total_volume).toLocaleString()}kg`);
+            if (latest.total_sets) parts.push(`${latest.total_sets} sets`);
+            el.textContent = parts.length > 0 ? parts.join(' · ') : 'No data.';
+        }
+
+        // ═══════════════════ PROGRESS TAB ═══════════════════
+
+        _bindProgressControls() {
+            const exerciseSelect = document.getElementById('wt-exercise-select');
+            const weeksSelect = document.getElementById('wt-progress-weeks');
+
+            if (exerciseSelect) {
+                exerciseSelect.addEventListener('change', () => this.loadProgress());
+            }
+            if (weeksSelect) {
+                weeksSelect.addEventListener('change', () => this.loadProgress());
+            }
+        }
+
+        async loadProgress() {
+            if (!this.userId) return;
+            const exercise = document.getElementById('wt-exercise-select').value;
+            const weeks = parseInt(document.getElementById('wt-progress-weeks').value) || 8;
+
+            try {
+                let url = `/api/progress/${this.userId}?weeks=${weeks}`;
+                if (exercise) url += `&exercise=${encodeURIComponent(exercise)}`;
+
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                if (exercise) {
+                    this.progressData = data;
+                    document.getElementById('wt-single-exercise-view').style.display = 'block';
+                    document.getElementById('wt-all-exercises-view').style.display = 'none';
+                    this._renderE1RMChart(data);
+                    this._renderVolumeChart(data);
+                    this._renderSessionHistory(data);
+                    this._renderPRRecords(data);
+                } else {
+                    this.allProgressData = data;
+                    document.getElementById('wt-single-exercise-view').style.display = 'none';
+                    document.getElementById('wt-all-exercises-view').style.display = 'block';
+                    this._renderAllExercises(data);
+                    this._populateExerciseDropdown(data);
+                }
+            } catch (e) {
+                console.error('WorkoutTracker: loadProgress failed', e);
+            }
+        }
+
+        _populateExerciseDropdown(data) {
+            const select = document.getElementById('wt-exercise-select');
+            const currentValue = select.value;
+            // Preserve "All" option
+            const existingOptions = new Set();
+            select.querySelectorAll('option').forEach(o => existingOptions.add(o.value));
+
+            if (data.exercises && data.exercises.length > 0) {
+                data.exercises.forEach(ex => {
+                    if (!existingOptions.has(ex.exercise)) {
+                        const opt = document.createElement('option');
+                        opt.value = ex.exercise;
+                        opt.textContent = ex.exercise;
+                        select.appendChild(opt);
+                    }
+                });
+            }
+            select.value = currentValue;
+        }
+
+        _renderE1RMChart(data) {
+            const canvas = document.getElementById('wt-e1rm-chart');
+            if (!canvas) return;
+
+            if (this.e1rmChart) {
+                this.e1rmChart.destroy();
+                this.e1rmChart = null;
+            }
+
+            const trend = data.weekly_trend || [];
+            if (trend.length === 0) {
+                canvas.parentElement.style.display = 'none';
+                return;
+            }
+            canvas.parentElement.style.display = 'block';
+
+            const labels = trend.map(w => w.week_start || '');
+            const e1rmValues = trend.map(w => w.best_e1rm || 0);
+
+            this.e1rmChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Est. 1RM (kg)',
+                        data: e1rmValues,
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88,166,255,0.1)',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#58a6ff',
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        fill: true,
+                    }]
+                },
+                options: this._chartOptions('kg')
+            });
+        }
+
+        _renderVolumeChart(data) {
+            const canvas = document.getElementById('wt-volume-chart');
+            if (!canvas) return;
+
+            if (this.volumeChart) {
+                this.volumeChart.destroy();
+                this.volumeChart = null;
+            }
+
+            const trend = data.weekly_trend || [];
+            if (trend.length === 0) {
+                canvas.parentElement.style.display = 'none';
+                return;
+            }
+            canvas.parentElement.style.display = 'block';
+
+            const labels = trend.map(w => w.week_start || '');
+            const volValues = trend.map(w => w.total_volume || 0);
+
+            this.volumeChart = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Volume (kg)',
+                        data: volValues,
+                        backgroundColor: 'rgba(63,185,80,0.5)',
+                        borderColor: '#3fb950',
+                        borderWidth: 1.5,
+                        borderRadius: 6,
+                    }]
+                },
+                options: this._chartOptions('kg')
+            });
+        }
+
+        _chartOptions(unit) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(22,27,34,0.95)',
+                        titleColor: '#c9d1d9',
+                        bodyColor: '#8b949e',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        padding: 10,
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                        ticks: { color: '#8b949e', font: { size: 11 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                        ticks: {
+                            color: '#8b949e',
+                            font: { size: 11 },
+                            callback: (v) => `${v}${unit}`
+                        }
+                    }
+                }
+            };
+        }
+
+        _renderSessionHistory(data) {
+            const container = document.getElementById('wt-session-history');
+            if (!container) return;
+
+            const trend = data.weekly_trend || [];
+            if (trend.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // Show last 5 weeks of data as "sessions"
+            const recentWeeks = trend.slice(-5).reverse();
+            let html = '<h3 class="wt-chart-title" style="margin-bottom:10px;">📅 Session History</h3>';
+
+            recentWeeks.forEach(w => {
+                const prHtml = w.has_pr ? ' <span class="wt-all-ex-pr-badge">🏆 PR</span>' : '';
+                html += `
+                    <div class="wt-session-card">
+                        <div class="wt-session-date">Week of ${w.week_start}${prHtml}</div>
+                        <div class="wt-session-sets">
+                            <span class="wt-set-pill${w.has_pr ? ' wt-pr-set' : ''}">Best: ${w.best_weight || 0}kg × ${w.best_reps || 0}</span>
+                            <span class="wt-set-pill">Vol: ${Math.round(w.total_volume || 0).toLocaleString()}kg</span>
+                            <span class="wt-set-pill">${w.total_sets || 0} sets</span>
+                            ${w.best_e1rm ? `<span class="wt-set-pill">e1RM: ${w.best_e1rm}kg</span>` : ''}
+                        </div>
+                    </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        _renderPRRecords(data) {
+            const container = document.getElementById('wt-pr-records');
+            if (!container) return;
+
+            const pr = data.all_time_pr;
+            if (!pr || (!pr.best_weight && !pr.best_volume_set && !pr.best_e1rm)) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'block';
+
+            let html = '<div class="wt-pr-title">🏆 Personal Records</div>';
+
+            if (pr.best_e1rm) {
+                html += `<div class="wt-pr-item"><span class="wt-pr-label">Best Est. 1RM:</span> <span class="wt-pr-value">${pr.best_e1rm}kg</span></div>`;
+            }
+            if (pr.best_weight) {
+                html += `<div class="wt-pr-item"><span class="wt-pr-label">Best Set:</span> <span class="wt-pr-value">${pr.best_weight.weight_kg}kg × ${pr.best_weight.reps}</span></div>`;
+            }
+            if (pr.best_volume_set) {
+                html += `<div class="wt-pr-item"><span class="wt-pr-label">Best Volume (set):</span> <span class="wt-pr-value">${Math.round(pr.best_volume_set.volume_load || 0).toLocaleString()}kg</span></div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        _renderAllExercises(data) {
+            const container = document.getElementById('wt-all-exercises-list');
+            if (!container) return;
+
+            const exercises = data.exercises || [];
+            if (exercises.length === 0) {
+                container.innerHTML = `
+                    <div class="wt-empty-state">
+                        <p>No exercise data yet.</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">Start logging sets via the AI coach to see your progress.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            exercises.forEach(ex => {
+                const card = document.createElement('div');
+                card.className = 'wt-all-ex-card';
+
+                const prBadge = ex.pr_count > 0
+                    ? `<span class="wt-all-ex-pr-badge">🏆 ${ex.pr_count}</span>`
+                    : '';
+
+                card.innerHTML = `
+                    <div class="wt-all-ex-name">${ex.exercise}${prBadge}</div>
+                    <div class="wt-all-ex-stats">
+                        <div class="wt-all-ex-stat">
+                            <span class="wt-all-ex-stat-val">${ex.total_sets}</span>
+                            sets
+                        </div>
+                        <div class="wt-all-ex-stat">
+                            <span class="wt-all-ex-stat-val">${Math.round(ex.total_volume).toLocaleString()}</span>
+                            vol (kg)
+                        </div>
+                        <div class="wt-all-ex-stat">
+                            <span class="wt-all-ex-stat-val">${ex.best_weight}kg</span>
+                            best
+                        </div>
+                    </div>
+                `;
+
+                // Click to filter to this exercise
+                card.addEventListener('click', () => {
+                    const select = document.getElementById('wt-exercise-select');
+                    // Ensure option exists
+                    let found = false;
+                    select.querySelectorAll('option').forEach(o => {
+                        if (o.value === ex.exercise) found = true;
+                    });
+                    if (!found) {
+                        const opt = document.createElement('option');
+                        opt.value = ex.exercise;
+                        opt.textContent = ex.exercise;
+                        select.appendChild(opt);
+                    }
+                    select.value = ex.exercise;
+                    this.loadProgress();
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        // ═══════════════════ VOLUME HEATMAP TAB ═══════════════════
+
+        _bindVolumeControls() {
+            const prevBtn = document.getElementById('wt-week-prev');
+            const nextBtn = document.getElementById('wt-week-next');
+
+            if (prevBtn) {
+                prevBtn.addEventListener('click', () => {
+                    this.weekOffset++;
+                    this.loadMuscleVolume();
+                });
+            }
+            if (nextBtn) {
+                nextBtn.addEventListener('click', () => {
+                    if (this.weekOffset > 0) {
+                        this.weekOffset--;
+                        this.loadMuscleVolume();
+                    }
+                });
+            }
+        }
+
+        async loadMuscleVolume() {
+            if (!this.userId) return;
+            this._updateWeekLabel();
+
+            try {
+                const res = await fetch(`/api/muscle-volume/${this.userId}?week_offset=${this.weekOffset}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                this.muscleVolumeData = await res.json();
+                this._renderMuscleBars();
+            } catch (e) {
+                console.error('WorkoutTracker: loadMuscleVolume failed', e);
+            }
+        }
+
+        _updateWeekLabel() {
+            const label = document.getElementById('wt-week-label');
+            if (!label) return;
+            if (this.weekOffset === 0) label.textContent = 'This Week';
+            else if (this.weekOffset === 1) label.textContent = 'Last Week';
+            else label.textContent = `${this.weekOffset}w ago`;
+        }
+
+        _renderMuscleBars() {
+            const container = document.getElementById('wt-muscle-bars');
+            if (!container) return;
+
+            const volumes = (this.muscleVolumeData && this.muscleVolumeData.muscle_volumes) || [];
+            if (volumes.length === 0) {
+                container.innerHTML = `
+                    <div class="wt-empty-state">
+                        <p>No volume data yet.</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">Log exercise sets to see your weekly muscle volume.</p>
+                    </div>`;
+                return;
+            }
+
+            // Get volume targets from user experience level
+            const targets = this._getVolumeTargets();
+            container.innerHTML = '';
+
+            // Sort muscles largest target first
+            const sortedMuscles = this._getAllMuscleGroups();
+            const volumeMap = {};
+            volumes.forEach(v => {
+                const key = (v.muscle_group || '').toLowerCase().replace(/\s+/g, '_');
+                volumeMap[key] = v.completed_sets || 0;
+            });
+
+            sortedMuscles.forEach(muscle => {
+                const completed = volumeMap[muscle] || 0;
+                const target = targets[muscle] || targets.default || 12;
+                const pct = Math.min((completed / target) * 100, 100);
+                const overPct = completed > target ? 100 : pct;
+
+                let colorClass = 'wt-vol-green';
+                if (completed > target) colorClass = 'wt-vol-over';
+                else if (pct < 50) colorClass = 'wt-vol-red';
+                else if (pct < 80) colorClass = 'wt-vol-yellow';
+
+                const row = document.createElement('div');
+                row.className = 'wt-muscle-row';
+                row.innerHTML = `
+                    <span class="wt-muscle-name">${this._capitalize(muscle.replace(/_/g, ' '))}</span>
+                    <div class="wt-muscle-bar-track">
+                        <div class="wt-muscle-bar-fill ${colorClass}" style="width:${overPct}%"></div>
+                    </div>
+                    <span class="wt-muscle-count">${completed}/${target} sets</span>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        _getVolumeTargets() {
+            // Default to intermediate targets. Could be enhanced to fetch user's experience level.
+            return {
+                default: 12,
+                chest: 16, back: 18, quads: 16, hamstrings: 12,
+                shoulders: 14, front_delts: 8, side_delts: 10, rear_delts: 8,
+                biceps: 12, triceps: 12, glutes: 14, calves: 8, core: 10,
+                forearms: 6, traps: 8
+            };
+        }
+
+        _getAllMuscleGroups() {
+            return [
+                'chest', 'back', 'quads', 'hamstrings', 'shoulders',
+                'biceps', 'triceps', 'glutes', 'calves', 'core',
+                'front_delts', 'side_delts', 'rear_delts', 'forearms', 'traps'
+            ];
+        }
+
+        // ── Utilities ────────────────────────────────────────────────────────
+        _capitalize(str) {
+            return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+
+        // Public: called when overlay opens
+        async open() {
+            if (!this.userId) return;
+            // Load the active tab's data
+            const activeTab = document.querySelector('.wt-tab.active');
+            const tab = activeTab ? activeTab.getAttribute('data-tab') : 'plan';
+            if (tab === 'plan') await this.loadPlan();
+            else if (tab === 'progress') await this.loadProgress();
+            else if (tab === 'volume') await this.loadMuscleVolume();
+        }
+    }
+
+    // Initialize the tracker
+    const tracker = new WorkoutTracker();
+    window.workoutTracker = tracker;
+
+    // Bind overlay open/close
+    if (workoutTrackerToggleBtn) {
+        workoutTrackerToggleBtn.addEventListener('click', () => {
+            tracker.setUserId(window.app.userId);
+            workoutTrackerOverlay.classList.remove('hidden');
+            tracker.open();
+        });
+    }
+    if (closeTrackerBtn) {
+        closeTrackerBtn.addEventListener('click', () => {
+            workoutTrackerOverlay.classList.add('hidden');
+        });
+    }
+
+    // Show workout tracker button when auth succeeds (same pattern as live coach)
+    const origAuthCheck = sbClient.auth.onAuthStateChange;
+    // The button visibility is already handled above in the auth state listener,
+    // but we need to ensure it shows. Patch into the existing logic:
+    const wtBtnRef = document.getElementById('workout-tracker-toggle-btn');
+    if (wtBtnRef) {
+        // Observe auth state for button visibility
+        const observer = new MutationObserver(() => {
+            if (liveCoachToggleBtn && !liveCoachToggleBtn.classList.contains('hidden')) {
+                wtBtnRef.classList.remove('hidden');
+            } else {
+                wtBtnRef.classList.add('hidden');
+            }
+        });
+        observer.observe(liveCoachToggleBtn, { attributes: true, attributeFilter: ['class'] });
+    }
 });
