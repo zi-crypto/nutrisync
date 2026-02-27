@@ -1,11 +1,13 @@
 import logging
 import os
+import time
 from typing import List, Optional
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from .runners import NutriSyncRunner
+from .services.analytics import capture as posthog_capture, identify as posthog_identify, shutdown as posthog_shutdown
 
 load_dotenv()
 
@@ -19,6 +21,11 @@ runner = NutriSyncRunner()
 @app.on_event("startup")
 async def startup_event():
     logger.info("NutriSync ADK is starting up...")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    posthog_shutdown()
+    logger.info("PostHog analytics flushed and shut down.")
 
 @app.get("/health")
 async def health_check():
@@ -47,6 +54,7 @@ class FeedbackRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
+    start_time = time.time()
     image_bytes = None
     mime_type = None
 
@@ -67,6 +75,17 @@ async def chat_endpoint(request: ChatRequest):
 
     # Process
     response = await runner.process_message(request.guest_id, request.message, image_bytes=image_bytes, mime_type=mime_type)
+
+    # ── PostHog: Track chat API call ──
+    latency_ms = int((time.time() - start_time) * 1000)
+    posthog_capture(request.guest_id, "api_chat_processed", {
+        "message_length": len(request.message),
+        "has_image": request.image is not None,
+        "response_length": len(response.get("text", "") or ""),
+        "has_chart": response.get("chart") is not None,
+        "latency_ms": latency_ms,
+    })
+
     return response
 
 @app.get("/api/history/{guest_id}")
@@ -103,6 +122,12 @@ async def submit_feedback(request: FeedbackRequest):
         else:
             runner.supabase.table("message_feedback").insert(data).execute()
             
+        # ── PostHog: Track feedback ──
+        posthog_capture(request.guest_id, "api_feedback_submitted", {
+            "feedback_value": "like" if request.feedback_value == 1 else "dislike",
+            "comment_length": len(request.feedback_comment),
+        })
+
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Error saving feedback: {e}")
@@ -344,6 +369,25 @@ async def update_profile(request: ProfileRequest):
                 ]
                 runner.supabase.table("user_equipment").insert(equip_rows).execute()
 
+        # ── PostHog: Track profile save and set person properties ──
+        posthog_capture(request.user_id, "api_profile_saved", {
+            "fitness_goal": request.fitness_goal,
+            "experience_level": request.experience_level,
+            "sport_type": request.sport_type,
+            "equipment_access": request.equipment_access,
+            "workout_days": request.workout_days_per_week,
+            "has_split": bool(split_schedule),
+            "equipment_count": len(equipment_list) if equipment_list else 0,
+            "rm_count": len(one_rm_records) if one_rm_records else 0,
+        })
+        posthog_identify(request.user_id, {
+            "name": request.name,
+            "fitness_goal": request.fitness_goal,
+            "experience_level": request.experience_level,
+            "sport_type": request.sport_type,
+            "equipment_access": request.equipment_access,
+        })
+
         return {"status": "success", "message": "Profile updated", "targets": targets}
     except Exception as e:
         logger.error(f"Error updating profile: {e}")
@@ -447,6 +491,17 @@ async def log_live_coach_exercise(request: LiveCoachLogRequest):
         insert_resp = runner.supabase.table("exercise_logs").insert(row).execute()
         if not insert_resp.data:
             raise HTTPException(status_code=500, detail="Failed to insert exercise log.")
+
+        # ── PostHog: Track live coach exercise log ──
+        posthog_capture(request.user_id, "api_live_coach_logged", {
+            "exercise": exercise_name,
+            "reps": request.reps,
+            "weight_kg": weight_kg,
+            "set_number": set_number,
+            "is_pr": is_pr,
+            "pr_type": pr_type,
+            "volume_load": vol,
+        })
 
         return {
             "success": True,
@@ -605,12 +660,28 @@ async def get_muscle_volume(user_id: str, week_offset: int = 0):
 
 # Serve Static Files (Frontend)
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
+from jinja2 import Environment, FileSystemLoader
+
+# Jinja2 environment for template rendering (index.html)
+_jinja_env = Environment(
+    loader=FileSystemLoader("nutrisync_adk/static"),
+    autoescape=True,
+)
+
+# PostHog config read once from environment
+_POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY", "")
+_POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://eu.i.posthog.com")
 
 # Mount static directory
 app.mount("/static", StaticFiles(directory="nutrisync_adk/static"), name="static")
 
-# Serve index.html at root
+# Serve index.html at root — rendered via Jinja2 to inject server-side config
 @app.get("/")
 async def serve_index():
-    return FileResponse("nutrisync_adk/static/index.html")
+    template = _jinja_env.get_template("index.html")
+    html = template.render(
+        posthog_api_key=_POSTHOG_API_KEY,
+        posthog_host=_POSTHOG_HOST,
+    )
+    return HTMLResponse(content=html)

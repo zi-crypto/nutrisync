@@ -3,6 +3,7 @@ import json
 import asyncio
 import base64
 import os
+import time
 from typing import Dict, Any, Optional
 
 from google.adk.sessions import DatabaseSessionService
@@ -15,6 +16,7 @@ from dotenv import load_dotenv
 from .agents.coach import coach_agent
 from .services.local_context import ContextService
 from .services.history_service import HistoryService
+from .services.analytics import capture as posthog_capture
 from .tools.utils import get_supabase_client
 from .user_context import current_user_id
 
@@ -184,9 +186,12 @@ class NutriSyncRunner:
 
     async def _process_message_impl(self, user_id: str, text: str, image_bytes: bytes = None, mime_type: str = None) -> dict:
         """Internal implementation — runs under per-user lock."""
+        process_start = time.time()
 
         # 1. Fetch Dynamic Context (Parallel DB queries inside ContextService)
+        ctx_start = time.time()
         context_data = await self.context_service.get_user_context(user_id)
+        ctx_duration_ms = int((time.time() - ctx_start) * 1000)
 
         # 2. Prepare session state with fresh context
         state_updates = {
@@ -227,6 +232,8 @@ class NutriSyncRunner:
         final_response_text = ""
         collected_tool_calls = []
         chart_data = None
+        tool_call_count = 0
+        tool_names_used = []
 
         async for event in self.runner.run_async(
             user_id=user_id,
@@ -238,9 +245,16 @@ class NutriSyncRunner:
             if hasattr(event, 'content') and event.content:
                 for part in event.content.parts:
                     if hasattr(part, 'function_call') and part.function_call:
+                        tool_call_count += 1
+                        tool_names_used.append(part.function_call.name)
                         collected_tool_calls.append({
                             "name": part.function_call.name,
                             "args": dict(part.function_call.args) if part.function_call.args else {}
+                        })
+                        # ── PostHog: Track each AI tool invocation ──
+                        posthog_capture(user_id, "ai_tool_called", {
+                            "tool_name": part.function_call.name,
+                            "has_args": bool(part.function_call.args),
                         })
                     if hasattr(part, 'function_response') and part.function_response:
                         response_val = part.function_response.response
@@ -275,6 +289,18 @@ class NutriSyncRunner:
                 final_response_text,
                 tool_calls=collected_tool_calls if collected_tool_calls else None
             )
+
+        # ── PostHog: Track full agent run metrics ──
+        total_duration_ms = int((time.time() - process_start) * 1000)
+        posthog_capture(user_id, "ai_agent_run_completed", {
+            "context_load_ms": ctx_duration_ms,
+            "total_duration_ms": total_duration_ms,
+            "tool_call_count": tool_call_count,
+            "tools_used": tool_names_used,
+            "has_image_input": image_bytes is not None,
+            "has_chart_output": chart_data is not None,
+            "response_length": len(final_response_text),
+        })
 
         return {
             "text": final_response_text,

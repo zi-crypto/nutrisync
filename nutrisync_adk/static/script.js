@@ -296,10 +296,24 @@ class ChatApp {
             this.hideTypingIndicator();
             this.appendMessage('model', data.text, data.chart, null, data.message_id);
 
+            // ── PostHog: Track chat message sent ──
+            if (typeof posthog !== 'undefined') {
+                posthog.capture('chat_message_sent', {
+                    message_length: text.length,
+                    has_image: !!image,
+                    has_chart_response: !!data.chart,
+                    response_length: (data.text || '').length,
+                });
+            }
+
         } catch (error) {
             console.error('Send Error:', error);
             this.hideTypingIndicator();
             this.appendMessage('model', `**Error**: Failed to communicate with the server. (${error.message})`);
+            // ── PostHog: Track chat error ──
+            if (typeof posthog !== 'undefined') {
+                posthog.capture('chat_message_error', { error: error.message });
+            }
         }
     }
 
@@ -623,6 +637,13 @@ class ChatApp {
                     feedback_comment: feedbackComment
                 })
             });
+            // ── PostHog: Track message feedback ──
+            if (response.ok && typeof posthog !== 'undefined') {
+                posthog.capture('message_feedback_submitted', {
+                    feedback_value: feedbackValue === 1 ? 'like' : 'dislike',
+                    comment_length: feedbackComment.length,
+                });
+            }
             return response.ok;
         } catch (error) {
             console.error('Feedback Error:', error);
@@ -776,6 +797,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 liveCoachSystem.start();
                 startCoachBtn.classList.add('hidden');
                 stopCoachBtn.classList.remove('hidden');
+                // ── PostHog: Track live coach start ──
+                if (typeof posthog !== 'undefined') {
+                    posthog.capture('live_coach_started', {
+                        exercise: coachExerciseSelect ? coachExerciseSelect.value : 'squat',
+                    });
+                }
             }
         });
     }
@@ -787,6 +814,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 startCoachBtn.classList.remove('hidden');
                 stopCoachBtn.classList.add('hidden');
                 updateLogButton();
+                // ── PostHog: Track live coach stop ──
+                if (typeof posthog !== 'undefined') {
+                    posthog.capture('live_coach_stopped', {
+                        exercise: coachExerciseSelect ? coachExerciseSelect.value : 'squat',
+                        sets_logged: coachSetsLogged,
+                    });
+                }
             }
         });
     }
@@ -845,6 +879,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                         `Set ${data.set_number} logged: ${data.reps} reps × ${data.weight_kg}kg${prMsg}`,
                         true
                     );
+                    // ── PostHog: Track live coach exercise logged ──
+                    if (typeof posthog !== 'undefined') {
+                        posthog.capture('live_coach_exercise_logged', {
+                            exercise: data.exercise_name,
+                            set_number: data.set_number,
+                            reps: data.reps,
+                            weight_kg: data.weight_kg,
+                            is_pr: data.is_pr,
+                            pr_type: data.pr_type,
+                        });
+                    }
 
                     // Update session stats
                     coachSessionStats.classList.remove('hidden');
@@ -913,6 +958,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     password: password
                 });
                 if (error) throw error;
+                // ── PostHog: Track sign up ──
+                if (typeof posthog !== 'undefined') posthog.capture('user_signed_up', { method: 'email' });
                 authMessage.innerText = "Check your email for the confirmation link!";
                 authMessage.classList.add("success");
             } else {
@@ -921,6 +968,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     password: password
                 });
                 if (error) throw error;
+                // ── PostHog: Track sign in ──
+                if (typeof posthog !== 'undefined') posthog.capture('user_signed_in', { method: 'email' });
                 // Success - onAuthStateChange will handle the rest
             }
         } catch (error) {
@@ -1570,6 +1619,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentStep < totalSteps) {
             currentStep++;
             showStep(currentStep);
+            // ── PostHog: Track onboarding step ──
+            if (typeof posthog !== 'undefined') {
+                posthog.capture('onboarding_step_viewed', { step: currentStep, total_steps: totalSteps });
+            }
             // Trigger calc if moving to step 6
             if (currentStep === 6) estimateCalories();
         }
@@ -1660,6 +1713,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Success
             onboardingOverlay.classList.add('hidden');
 
+            // ── PostHog: Track onboarding/profile save completed ──
+            if (typeof posthog !== 'undefined') {
+                posthog.capture('onboarding_completed', {
+                    fitness_goal: formData.fitness_goal,
+                    experience_level: formData.experience_level,
+                    sport_type: formData.sport_type,
+                    equipment_access: formData.equipment_access,
+                    workout_days: formData.workout_days_per_week,
+                    has_1rm_records: (formData.one_rm_records || []).length > 0,
+                    equipment_count: (formData.equipment_list || []).length,
+                    diet_type: formData.typical_diet_type,
+                });
+                // Set person properties for segmentation
+                posthog.setPersonProperties({
+                    name: formData.name,
+                    fitness_goal: formData.fitness_goal,
+                    experience_level: formData.experience_level,
+                    sport_type: formData.sport_type,
+                    equipment_access: formData.equipment_access,
+                });
+            }
+
             let msg = `Profile saved! Welcome, ${formData.name}.`;
             if (resData.targets) {
                 msg += `\nCalorie Target: ${resData.targets.daily_calorie_target} kcal`;
@@ -1708,6 +1783,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         settingsBtn.addEventListener('click', async () => {
             const userId = window.app.userId;
             if (!userId) return;
+            // ── PostHog: Track profile settings opened ──
+            if (typeof posthog !== 'undefined') posthog.capture('profile_settings_opened');
 
             try {
                 // Fetch current data
@@ -1782,6 +1859,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (lastUserId !== session.user.id) {
                 lastUserId = session.user.id;
 
+                // ── PostHog: Identify user on auth ──
+                if (typeof posthog !== 'undefined') {
+                    posthog.identify(session.user.id, {
+                        email: session.user.email,
+                        auth_provider: session.user.app_metadata?.provider || 'email',
+                    });
+                }
+
                 // User is signed in
                 authOverlay.classList.add('hidden');
                 window.app.setUserId(session.user.id);
@@ -1798,6 +1883,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             // User is signed out
             if (lastUserId !== null) {
+                // ── PostHog: Reset on logout ──
+                if (typeof posthog !== 'undefined') posthog.reset();
                 lastUserId = null;
                 authOverlay.classList.remove('hidden');
                 window.app.setUserId(null);
@@ -1853,6 +1940,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const target = tab.getAttribute('data-tab');
                     document.getElementById(`wt-${target}-tab`).classList.add('active');
                     // Lazy-load data on tab switch
+                    // ── PostHog: Track workout tracker tab switch ──
+                    if (typeof posthog !== 'undefined') {
+                        posthog.capture('workout_tracker_tab_viewed', { tab: target });
+                    }
                     if (target === 'plan') this.loadPlan();
                     if (target === 'progress') this.loadProgress();
                     if (target === 'volume') this.loadMuscleVolume();
@@ -2494,6 +2585,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             tracker.setUserId(window.app.userId);
             workoutTrackerOverlay.classList.remove('hidden');
             tracker.open();
+            // ── PostHog: Track workout tracker opened ──
+            if (typeof posthog !== 'undefined') posthog.capture('workout_tracker_opened');
         });
     }
     if (closeTrackerBtn) {
