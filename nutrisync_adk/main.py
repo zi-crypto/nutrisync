@@ -312,30 +312,44 @@ async def update_profile(request: ProfileRequest):
                 "weight_kg": current_weight
             }).execute()
         
-        # Handle Custom Split
+        # Handle Custom Split (Upsert pattern: reuse existing active split)
         if split_schedule and len(split_schedule) > 0:
-            # 1. Deactivate old splits
-            runner.supabase.table("workout_splits").update({"is_active": False}).eq("user_id", request.user_id).execute()
-            
-            # 2. Create new split
-            # Using specific name if provided or generic 'Custom Split'
             split_name = f"{data.get('sport_type', 'Gym')} Split"
-            split_res = runner.supabase.table("workout_splits").insert({
-                "user_id": request.user_id,
-                "name": split_name,
-                "is_active": True
-            }).execute()
-            
-            if split_res.data:
-                split_id = split_res.data[0]['id']
-                items_data = []
-                for idx, workout_name in enumerate(split_schedule):
-                    items_data.append({
-                        "split_id": split_id,
-                        "order_index": idx + 1,
-                        "workout_name": workout_name
-                    })
-                
+
+            # Check for existing active split
+            existing_split_resp = (runner.supabase.table("workout_splits")
+                                   .select("id, name")
+                                   .eq("user_id", request.user_id)
+                                   .eq("is_active", True)
+                                   .limit(1)
+                                   .execute())
+
+            if existing_split_resp.data:
+                # Reuse existing split — update name if changed
+                split_id = existing_split_resp.data[0]["id"]
+                if existing_split_resp.data[0]["name"] != split_name:
+                    (runner.supabase.table("workout_splits")
+                     .update({"name": split_name})
+                     .eq("id", split_id)
+                     .execute())
+
+                # Replace split_items (lightweight day names, no FKs depend on them)
+                runner.supabase.table("split_items").delete().eq("split_id", split_id).execute()
+            else:
+                # No active split — deactivate any stale ones and create new
+                runner.supabase.table("workout_splits").update({"is_active": False}).eq("user_id", request.user_id).execute()
+                split_res = runner.supabase.table("workout_splits").insert({
+                    "user_id": request.user_id,
+                    "name": split_name,
+                    "is_active": True
+                }).execute()
+                split_id = split_res.data[0]['id'] if split_res.data else None
+
+            if split_id:
+                items_data = [
+                    {"split_id": split_id, "order_index": idx + 1, "workout_name": workout_name}
+                    for idx, workout_name in enumerate(split_schedule)
+                ]
                 if items_data:
                     runner.supabase.table("split_items").insert(items_data).execute()
 

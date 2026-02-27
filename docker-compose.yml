@@ -40,7 +40,7 @@ services:
       - vhost:/etc/nginx/vhost.d
       - html:/usr/share/nginx/html
       - /var/run/docker.sock:/tmp/docker.sock:ro
-      - ./nginx/vhost.d/bot.ziadamer.com_location:/etc/nginx/vhost.d/bot.ziadamer.com_location:ro
+      - ./nginx/vhost.d/bot.ziadamer.com:/etc/nginx/vhost.d/bot.ziadamer.com:ro
     restart: always
 
   acme-companion:

@@ -52,7 +52,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 
 ### FR-USER-02: Onboarding & Profile Management
 - **Description**: New users must complete an onboarding flow capturing details like DOB, height, weight, target weight, fitness goal, experience, equipment, diet type, allergies, sport type, workout split, and 1RM records.
-- **Implementation**: Frontend maps to `POST /api/profile` to upsert the `user_profile` (including initializing `starting_weight_kg`), generates target macros, handles custom `workout_splits`/`split_items`, updates `user_1rm_records`, and persists the user's specific `equipment_list` to the `user_equipment` table (delete-and-reinsert pattern). Also logs any provided weight to `body_composition_logs`. Frontend fetches existing profile using `GET /api/profile/{user_id}` which also returns the equipment list. The equipment UI features a chip/tag selector with 72+ preset items organized by category (machines, free weights, cardio, accessories) across three tiers (Gym/Home/Bodyweight), plus support for custom equipment entries via a text input.
+- **Implementation**: Frontend maps to `POST /api/profile` to upsert the `user_profile` (including initializing `starting_weight_kg`), generates target macros, handles custom `workout_splits`/`split_items` via an **upsert pattern** (reuses the existing active split UUID if one exists, only creates a new split on first-time onboarding — this preserves the `workout_plan_exercises.split_id` FK and prevents orphaned plan data; `split_items` are replaced via delete-and-reinsert since no other tables FK to them), updates `user_1rm_records`, and persists the user's specific `equipment_list` to the `user_equipment` table (delete-and-reinsert pattern). Also logs any provided weight to `body_composition_logs`. Frontend fetches existing profile using `GET /api/profile/{user_id}` which also returns the equipment list. The equipment UI features a chip/tag selector with 72+ preset items organized by category (machines, free weights, cardio, accessories) across three tiers (Gym/Home/Bodyweight), plus support for custom equipment entries via a text input.
 
 ### FR-CHAT-01: Conversational AI Coach
 - **Description**: Users can chat with an AI coach that responds with text and charts.
@@ -154,6 +154,28 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - `GET /api/progress/{user_id}?exercise=&weeks=8` → Single exercise: `{exercise, weekly_trend: [{week_start, best_e1rm, total_volume, total_sets, best_weight, best_reps, has_pr}], all_time_pr: {best_weight, best_volume_set, best_e1rm}}`. All exercises: `{exercises: [{exercise, total_sets, total_volume, best_weight, best_volume_set, pr_count, last_date}], total_tracked}`.
   - `GET /api/muscle-volume/{user_id}?week_offset=0` → `{week_offset, muscle_volumes: [{muscle_group, completed_sets}]}`
 
+### FR-ANALYTICS-01: Product Analytics (PostHog)
+- **Description**: Dual-layer analytics capturing both frontend user interactions and backend system metrics for product insight.
+- **Configuration**:
+  - `POSTHOG_API_KEY`: Shared project API key (used by both frontend Jinja2 injection and backend Python SDK).
+  - `POSTHOG_HOST`: PostHog instance URL (default: `https://eu.i.posthog.com`).
+- **Frontend Events** (JS SDK via `script.js`):
+  - `user_signed_up` / `user_signed_in` — auth funnel.
+  - `chat_message_sent` (`message_length`, `has_image`) / `chat_message_error` (`error`) — chat usage.
+  - `message_feedback_submitted` (`feedback_value`, `message_id`) — response quality signal.
+  - `live_coach_started` / `live_coach_stopped` (`exercise`, `duration_seconds`) / `live_coach_exercise_logged` (`exercise`, `reps`, `good_form_pct`) — vision coach engagement.
+  - `onboarding_step_viewed` (`step`, `total_steps`) / `onboarding_completed` — wizard funnel.
+  - `profile_settings_opened` / `workout_tracker_opened` / `workout_tracker_tab_viewed` (`tab`) — feature engagement.
+- **Backend Events** (Python SDK via `services/analytics.py`):
+  - `api_chat_processed` (`message_length`, `has_image`, `response_length`, `has_chart`, `latency_ms`) — API performance.
+  - `api_feedback_submitted` (`feedback_value`, `message_id`) — server-side feedback confirmation.
+  - `api_profile_saved` — profile persistence.
+  - `api_live_coach_logged` — live coach data saved.
+  - `ai_tool_called` (`tool_name`, `has_args`) — per-tool invocation tracking.
+  - `ai_agent_run_completed` (`context_load_ms`, `total_duration_ms`, `tool_call_count`, `tools_used`, `has_image_input`, `has_chart_output`, `response_length`) — full agent run metrics.
+- **Adblocker Bypass**: Frontend SDK configured with `api_host: '/ingest'`. Nginx proxies `/ingest/*` to PostHog EU cloud via server-level `location` blocks in `nginx/vhost.d/bot.ziadamer.com`, making events appear as first-party requests.
+- **Resilience**: Backend analytics never block or crash the application — all captures wrapped in try/except. Missing API key gracefully disables analytics. Frontend checks `typeof posthog !== 'undefined'` before every capture.
+
 ## 4. Non-Functional Requirements
 - **Security**: Row Level Security (RLS) policies enforce isolated tenant access on all user-facing tables (including new `workout_plan_exercises` and `exercise_logs`). Context tools use `current_user_id` ContextVar to prevent prompt injection overriding user ID. The system prompt declares 6 XML context tags as UNTRUSTED DATA (`<user_profile>`, `<daily_totals>`, `<active_notes>`, `<equipment_list>`, `<one_rm_records>`, `<workout_plan>`) with explicit instructions to ignore any embedded prompt injection attempts.
 - **Performance**: High parallelization of DB queries in `ContextService` (6 concurrent async fetchers). ADK `DatabaseSessionService` `connect_args` configured with zero statement caching (`prepared_statement_cache_size=0`) for Supavisor compatibility. Exercise log queries use partial indexes (e.g., `WHERE is_warmup = false`) and composite indexes for efficient progressive overload calculations.
@@ -165,7 +187,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - `daily_goals`: Tracks daily aggregates (calories, workouts) and target achievements.
   - `chat_history`: Message stream including system/tool calls.
   - `message_feedback`: Thumbs up/down and comments mapped to `message_id`.
-  - `workout_splits` & `split_items`: Scheduled workout routines (e.g., Push/Pull/Legs).
+  - `workout_splits` & `split_items`: Scheduled workout routines (e.g., Push/Pull/Legs). Profile saves use an **upsert pattern** — the active split's UUID is reused across profile updates (only the name and `split_items` are refreshed), preserving `workout_plan_exercises.split_id` FK integrity. A new split row is only created when no active split exists (first-time onboarding).
   - `user_1rm_records`: Max lifts tracked per exercise.
   - `user_equipment`: Per-user granular equipment inventory (equipment_name, category) with RLS policies and a unique constraint on `(user_id, equipment_name)`.
   - `persistent_context`: Long-term user notes available in agent context.
@@ -184,3 +206,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 - **Google MediaPipe Pose**: In-browser client-side ML model download via JSDelivr CDN.
 - **QuickChart.io API**: External image generation service for Chart.js payloads.
 - **Web Speech API**: Browser-native voice synthesis for Live Coach.
+- **PostHog EU Cloud** (`eu.i.posthog.com`): Product analytics platform. Dual-layer integration:
+  - *Frontend*: JS SDK loaded via Jinja2 template. Events routed through first-party nginx proxy (`/ingest/*` → PostHog EU) to bypass adblockers. Auto-captures pageviews, pageleaves, and clicks. Custom events track chat usage, auth, onboarding funnel, live coach sessions, feedback, and workout tracker engagement.
+  - *Backend*: Python SDK (`posthog` package) singleton client in `services/analytics.py`. Captures server-side events invisible to the browser: API latency, AI tool invocations, agent run metrics, and profile saves. Configured via `POSTHOG_API_KEY` and `POSTHOG_HOST` environment variables.
+  - *Nginx Proxy*: `nginx/vhost.d/bot.ziadamer.com` defines two `location` blocks (`/ingest/static/` and `/ingest/`) that proxy to `eu-assets.i.posthog.com` and `eu.i.posthog.com` respectively, with SNI, HTTP/1.1 keepalive, and forwarded client IP headers.

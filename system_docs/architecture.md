@@ -20,6 +20,7 @@ C4Context
   System_Ext(genai, "Google GenAI", "Provides gemini-flash-latest large language model via ADK.")
   System_Ext(mediapipe, "Google MediaPipe", "Computer vision pose detection libraries loaded in browser.")
   System_Ext(quickchart, "QuickChart.io", "External API for generating chart images.")
+  System_Ext(posthog, "PostHog EU", "Product analytics platform (event tracking, user identification).")
 
   Rel(user, nutrisync, "Uses", "HTTPS")
   Rel(nutrisync, supabase, "Authenticates, persists data, runs edge functions", "HTTPS/WSS")
@@ -27,6 +28,7 @@ C4Context
   Rel(nutrisync, quickchart, "Requests chart image generation", "API")
   Rel(user, mediapipe, "Runs pose detection locally", "Webcam/Browser")
   Rel(mediapipe, nutrisync, "Integrates tracking logic", "JS API")
+  Rel(nutrisync, posthog, "Sends analytics events (frontend via nginx proxy, backend via Python SDK)", "HTTPS")
 ```
 
 ### 2.2 Container Level
@@ -47,6 +49,7 @@ C4Container
 
   System_Ext(supabase, "Supabase API & PostgreSQL", "Auth, Database, Edge Functions")
   System_Ext(genai, "Google GenAI API", "LLM endpoints (gemini-flash-latest)")
+  System_Ext(posthog, "PostHog EU Cloud", "Product analytics (eu.i.posthog.com)")
 
   Rel(user, nginx, "Visits application", "HTTPS")
   Rel(nginx, spa, "Delivers static files", "")
@@ -59,6 +62,10 @@ C4Container
   Rel(agent, genai, "Generate content", "API")
   Rel(agent, supabase, "Queries/Mutates", "asyncpg/psycopg")
   Rel(api, supabase, "Fetches profiles/history", "Supabase Python Client")
+  
+  Rel(spa, nginx, "Sends analytics via /ingest/*", "HTTPS")
+  Rel(nginx, posthog, "Proxies analytics events", "HTTPS")
+  Rel(api, posthog, "Sends server-side events", "PostHog Python SDK")
 ```
 
 ### 2.3 Component Level (Backend API)
@@ -116,8 +123,48 @@ C4Component
 - **`workout_coach.js`**: Integrates `MediaPipe/pose` library via camera stream to track angles and repetititons locally. Implements SOLID principles via `CameraManager`, `PoseEstimationService`, `UIRenderer`, `ExerciseEngine`, and specific profiles (`SquatProfile`, `PushupProfile`, `PullProfile`). Features dynamic range calibration and cross-contamination filtering.
 - **`style.css`**: Provides the premium Google Glassmorphism UI styling, including specialized styling for the Workout Tracker tabs, exercise cards, and progress bars.
 
+### Analytics (PostHog)
+NutriSync uses **PostHog** (EU Cloud) for product analytics with a dual-layer architecture:
+
+#### Frontend (JS SDK)
+- Loaded via `index.html` Jinja2 template (`{% if posthog_api_key %}`).
+- Configured with `api_host: '/ingest'` to route all events through the first-party nginx reverse proxy, bypassing adblockers.
+- Auto-captures: pageviews, pageleaves, and autocapture (clicks, inputs).
+- **Custom events** captured in `script.js`:
+  - `user_signed_up` / `user_signed_in` — authentication actions.
+  - `chat_message_sent` — with `message_length`, `has_image`.
+  - `chat_message_error` — on API failures.
+  - `message_feedback_submitted` — with `feedback_value`, `message_id`.
+  - `live_coach_started` / `live_coach_stopped` — with `exercise` and `duration_seconds`.
+  - `live_coach_exercise_logged` — with `exercise`, `reps`, `good_form_pct`.
+  - `onboarding_step_viewed` / `onboarding_completed` — wizard funnel tracking.
+  - `profile_settings_opened` — settings engagement.
+  - `workout_tracker_opened` / `workout_tracker_tab_viewed` — tracker engagement.
+
+#### Backend (Python SDK)
+- Singleton client in `services/analytics.py` using `posthog` Python package.
+- Configured via `POSTHOG_API_KEY` and `POSTHOG_HOST` env vars (defaults to `https://eu.i.posthog.com`).
+- Graceful degradation: missing API key or package disables analytics without breaking the app.
+- Flushed on shutdown via `posthog_shutdown()` in FastAPI `on_shutdown` event.
+- **Server-side events** captured:
+  - `api_chat_processed` (in `main.py`) — `message_length`, `has_image`, `response_length`, `has_chart`, `latency_ms`.
+  - `api_feedback_submitted` (in `main.py`) — `feedback_value`, `message_id`.
+  - `api_profile_saved` (in `main.py`) — profile save confirmation.
+  - `api_live_coach_logged` (in `main.py`) — live coach exercise data persisted.
+  - `ai_tool_called` (in `runners.py`) — per-tool invocation tracking with `tool_name`, `has_args`.
+  - `ai_agent_run_completed` (in `runners.py`) — full run metrics: `context_load_ms`, `total_duration_ms`, `tool_call_count`, `tools_used`, `has_image_input`, `has_chart_output`, `response_length`.
+- **User identification**: `posthog_identify()` links Supabase UUID to person properties.
+
+#### Nginx Reverse Proxy (Adblocker Bypass)
+The frontend JS SDK sends events to `/ingest/*` on the same domain (`bot.ziadamer.com`), which nginx proxies to PostHog EU:
+- `/ingest/static/*` → `https://eu-assets.i.posthog.com/static/` (JS SDK bundle, plugins).
+- `/ingest/*` → `https://eu.i.posthog.com/` (event ingestion, decide, config endpoints).
+- Configured in `nginx/vhost.d/bot.ziadamer.com` (server-level include for `nginxproxy/nginx-proxy`).
+- Uses `proxy_ssl_server_name on` + `proxy_ssl_verify off` for upstream TLS, `proxy_http_version 1.1` for keepalive.
+- Passes `X-Forwarded-For` and `X-Forwarded-Host` for accurate geo-IP attribution.
+
 ### Backend Services (`nutrisync_adk/`)
-- **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/chat/feedback`, `/api/workout-plan/{user_id}`, `/api/progress/{user_id}`, `/api/muscle-volume/{user_id}`, `/health`) and offline calculation of physiological formulas (Mifflin-St Jeor equation for macros/TDEE). Handles base64 data URI image decoding. The 3 new workout endpoints query `workout_plan_exercises`, `exercise_logs`, and the `get_exercise_progress`/`get_weekly_muscle_volume` DB functions directly.
+- **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/chat/feedback`, `/api/workout-plan/{user_id}`, `/api/progress/{user_id}`, `/api/muscle-volume/{user_id}`, `/health`) and offline calculation of physiological formulas (Mifflin-St Jeor equation for macros/TDEE). Handles base64 data URI image decoding. The 3 new workout endpoints query `workout_plan_exercises`, `exercise_logs`, and the `get_exercise_progress`/`get_weekly_muscle_volume` DB functions directly. **Workout split handling** uses an upsert pattern: `POST /api/profile` reuses the existing active split UUID when one exists (updating name and replacing `split_items`), and only creates a new split row on first-time onboarding — this preserves `workout_plan_exercises.split_id` FK integrity across profile saves.
 - **Runners (`runners.py`)**: Responsible for connecting the FastAPI requests to the ADK Agent, managing asynchronous database sessions utilizing `DatabaseSessionService`, and applying per-user `asyncio.Lock` mechanisms to prevent race conditions during ADK state updates. Uses `state_delta` parameter in `run_async()` (rather than direct `session.state` mutation) to inject 7 dynamic context keys (user_profile, daily_totals, current_time, active_notes, equipment_list, one_rm_records, workout_plan) into the ADK session state per the official ADK best practice for `DatabaseSessionService`. The `_build_instruction` InstructionProvider callback substitutes all 7 `{placeholder}` tokens in the system prompt template.
 - **Agent Sandbox (`agents/coach.py`)**: Agent configuration mapping the `gemini-flash-latest` model and 21 distinct tools registered to the `coach_agent`. The 5 newest tools cover workout plan generation, set-level exercise logging with PR detection, exercise history retrieval, and progressive overload trend analysis.
 - **Context & History Services (`services/`)**: `local_context.py` loads `user_profile`, `daily_goals`, `persistent_context`, `user_equipment`, `user_1rm_records`, and `workout_plan_exercises` simultaneously via `asyncio.gather` (6 parallel fetchers). `history_service.py` manages chronological chat and tool history dual-writes.

@@ -39,12 +39,7 @@
             capture_pageview: true,
             capture_pageleave: true,
             autocapture: true,
-            session_recording: {
-                maskAllInputs: false,
-                maskInputOptions: {
-                    password: true,
-                },
-            },
+            disable_session_recording: true,
             loaded: function(posthog) {
                 if (window.location.hostname === 'localhost') {
                     posthog.debug();
