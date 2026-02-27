@@ -693,6 +693,49 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Live Coach Logic ---
     let liveCoachSystem = null;
+    let coachSetsLogged = 0;
+
+    // Live Coach exercise logging elements
+    const logExerciseBtn = document.getElementById('log-exercise-btn');
+    const logExerciseBtnText = document.getElementById('log-exercise-btn-text');
+    const coachSessionStats = document.getElementById('coach-session-stats');
+    const coachSessionSets = document.getElementById('coach-session-sets');
+    const coachSessionRepsDisplay = document.getElementById('coach-session-reps-display');
+    const coachToast = document.getElementById('coach-toast');
+
+    const COACH_EXERCISE_LABELS = {
+        'squat': 'Bodyweight Squat',
+        'pushup': 'Push-up',
+        'pullup': 'Pull-up'
+    };
+
+    function getCoachReps() {
+        if (!liveCoachSystem || !liveCoachSystem.exerciseEngine) return 0;
+        const profile = liveCoachSystem.exerciseEngine.currentProfile;
+        return profile ? profile.reps : 0;
+    }
+
+    function updateLogButton() {
+        const reps = getCoachReps();
+        const exKey = coachExerciseSelect ? coachExerciseSelect.value : 'squat';
+        const exLabel = COACH_EXERCISE_LABELS[exKey] || exKey;
+
+        if (reps > 0) {
+            logExerciseBtn.classList.remove('hidden');
+            logExerciseBtn.disabled = false;
+            logExerciseBtnText.textContent = `Log ${reps} rep${reps !== 1 ? 's' : ''} — ${exLabel}`;
+        } else {
+            logExerciseBtnText.textContent = 'Log Exercise';
+            logExerciseBtn.disabled = true;
+        }
+    }
+
+    function showCoachToast(message, isSuccess = true) {
+        coachToast.textContent = message;
+        coachToast.className = `coach-toast ${isSuccess ? 'coach-toast-success' : 'coach-toast-error'}`;
+        coachToast.classList.remove('hidden');
+        setTimeout(() => coachToast.classList.add('hidden'), 4000);
+    }
 
     if (liveCoachToggleBtn) {
         liveCoachToggleBtn.addEventListener('click', () => {
@@ -706,6 +749,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const exerciseEngine = new window.ExerciseEngine();
                 liveCoachSystem = new window.LiveCoachController(cameraManager, poseService, uiRenderer, exerciseEngine);
             }
+
+            // Reset session stats when opening
+            coachSetsLogged = 0;
+            if (coachSessionStats) coachSessionStats.classList.add('hidden');
+            if (coachSessionSets) coachSessionSets.textContent = 'Sets logged: 0';
+            updateLogButton();
         });
     }
 
@@ -716,6 +765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             startCoachBtn.classList.remove('hidden');
             stopCoachBtn.classList.add('hidden');
+            logExerciseBtn.classList.add('hidden');
             liveCoachOverlay.classList.add('hidden');
         });
     }
@@ -736,6 +786,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 liveCoachSystem.stop();
                 startCoachBtn.classList.remove('hidden');
                 stopCoachBtn.classList.add('hidden');
+                updateLogButton();
             }
         });
     }
@@ -744,6 +795,80 @@ document.addEventListener('DOMContentLoaded', async () => {
         coachExerciseSelect.addEventListener('change', (e) => {
             if (liveCoachSystem && liveCoachSystem.exerciseEngine) {
                 liveCoachSystem.exerciseEngine.setExercise(e.target.value);
+                logExerciseBtn.classList.add('hidden');
+                logExerciseBtn.disabled = true;
+                coachSetsLogged = 0;
+                if (coachSessionStats) coachSessionStats.classList.add('hidden');
+                if (coachSessionSets) coachSessionSets.textContent = 'Sets logged: 0';
+            }
+        });
+    }
+
+    // Log Exercise button handler
+    if (logExerciseBtn) {
+        logExerciseBtn.addEventListener('click', async () => {
+            const reps = getCoachReps();
+            const exKey = coachExerciseSelect ? coachExerciseSelect.value : 'squat';
+            const userId = window.app ? window.app.userId : null;
+
+            if (!userId) {
+                showCoachToast('Not signed in. Please sign in first.', false);
+                return;
+            }
+            if (reps <= 0) {
+                showCoachToast('No reps to log. Do some reps first!', false);
+                return;
+            }
+
+            logExerciseBtn.disabled = true;
+            logExerciseBtnText.textContent = 'Logging...';
+
+            try {
+                const resp = await fetch('/api/live-coach/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        exercise_key: exKey,
+                        reps: reps,
+                    })
+                });
+
+                const data = await resp.json();
+
+                if (resp.ok && data.success) {
+                    coachSetsLogged++;
+                    const prMsg = data.is_pr
+                        ? ` 🏆 NEW ${data.pr_type.toUpperCase()} PR!`
+                        : '';
+                    showCoachToast(
+                        `Set ${data.set_number} logged: ${data.reps} reps × ${data.weight_kg}kg${prMsg}`,
+                        true
+                    );
+
+                    // Update session stats
+                    coachSessionStats.classList.remove('hidden');
+                    coachSessionSets.textContent = `Sets logged: ${coachSetsLogged}`;
+                    coachSessionRepsDisplay.textContent = `Last: ${data.reps} reps`;
+
+                    // Reset rep counter for next set
+                    if (liveCoachSystem && liveCoachSystem.exerciseEngine && liveCoachSystem.exerciseEngine.currentProfile) {
+                        liveCoachSystem.exerciseEngine.currentProfile.reps = 0;
+                        liveCoachSystem.exerciseEngine.currentProfile.feedback = "Ready";
+                        if (liveCoachSystem.exerciseEngine.currentProfile.state !== 'SETUP') {
+                            liveCoachSystem.exerciseEngine.currentProfile.state = 'UP';
+                        }
+                    }
+
+                    logExerciseBtnText.textContent = 'Log Exercise';
+                    logExerciseBtn.disabled = true;
+                } else {
+                    showCoachToast(data.detail || 'Failed to log exercise.', false);
+                    updateLogButton();
+                }
+            } catch (err) {
+                showCoachToast('Network error. Please try again.', false);
+                updateLogButton();
             }
         });
     }

@@ -349,6 +349,122 @@ async def update_profile(request: ProfileRequest):
         logger.error(f"Error updating profile: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ── Live Coach Exercise Logging ─────────────────────────────────────────────
+
+LIVE_COACH_EXERCISE_MAP = {
+    "squat": "Bodyweight Squat",
+    "pushup": "Push-up",
+    "pullup": "Pull-up",
+}
+
+class LiveCoachLogRequest(BaseModel):
+    user_id: str
+    exercise_key: str  # squat, pushup, pullup
+    reps: int
+    weight_kg: Optional[float] = None  # If null, uses body weight from profile
+
+@app.post("/api/live-coach/log")
+async def log_live_coach_exercise(request: LiveCoachLogRequest):
+    """Logs a single set from the Live Coach pose tracker into exercise_logs."""
+    try:
+        from .tools.utils import get_today_date_str
+
+        exercise_name = LIVE_COACH_EXERCISE_MAP.get(
+            request.exercise_key, request.exercise_key.title()
+        )
+
+        if request.reps <= 0:
+            raise HTTPException(status_code=400, detail="Reps must be greater than 0.")
+
+        # Resolve weight — use provided value or fallback to user's body weight
+        weight_kg = request.weight_kg
+        if weight_kg is None:
+            profile_resp = (runner.supabase.table("user_profile")
+                            .select("weight_kg")
+                            .eq("user_id", request.user_id)
+                            .limit(1)
+                            .execute())
+            weight_kg = profile_resp.data[0]["weight_kg"] if profile_resp.data else 0
+
+        log_date = get_today_date_str()
+
+        # Determine next set_number for this exercise today
+        existing_sets = (runner.supabase.table("exercise_logs")
+                         .select("set_number")
+                         .eq("user_id", request.user_id)
+                         .eq("log_date", log_date)
+                         .ilike("exercise_name", exercise_name)
+                         .order("set_number", desc=True)
+                         .limit(1)
+                         .execute())
+        set_number = (existing_sets.data[0]["set_number"] + 1) if existing_sets.data else 1
+
+        # ── PR Detection (volume PR & weight PR) ───────────────────────────
+        pr_resp = (runner.supabase.table("exercise_logs")
+                   .select("volume_load")
+                   .eq("user_id", request.user_id)
+                   .ilike("exercise_name", exercise_name)
+                   .eq("is_warmup", False)
+                   .order("volume_load", desc=True)
+                   .limit(1)
+                   .execute())
+        existing_best_volume = pr_resp.data[0]["volume_load"] if pr_resp.data else 0
+
+        weight_pr_resp = (runner.supabase.table("exercise_logs")
+                          .select("weight_kg")
+                          .eq("user_id", request.user_id)
+                          .ilike("exercise_name", exercise_name)
+                          .eq("is_warmup", False)
+                          .order("weight_kg", desc=True)
+                          .limit(1)
+                          .execute())
+        existing_best_weight = weight_pr_resp.data[0]["weight_kg"] if weight_pr_resp.data else 0
+
+        vol = weight_kg * request.reps
+        is_pr = False
+        pr_type = None
+        if vol > 0 and vol > existing_best_volume:
+            is_pr = True
+            pr_type = "volume"
+        elif weight_kg > 0 and weight_kg > existing_best_weight:
+            is_pr = True
+            pr_type = "weight"
+
+        # ── Insert ──────────────────────────────────────────────────────────
+        row = {
+            "user_id": request.user_id,
+            "log_date": log_date,
+            "exercise_name": exercise_name,
+            "set_number": set_number,
+            "weight_kg": weight_kg,
+            "reps": request.reps,
+            "is_warmup": False,
+            "is_pr": is_pr,
+            "notes": "Logged via Live Coach",
+        }
+
+        insert_resp = runner.supabase.table("exercise_logs").insert(row).execute()
+        if not insert_resp.data:
+            raise HTTPException(status_code=500, detail="Failed to insert exercise log.")
+
+        return {
+            "success": True,
+            "exercise_name": exercise_name,
+            "set_number": set_number,
+            "reps": request.reps,
+            "weight_kg": weight_kg,
+            "volume_load": vol,
+            "is_pr": is_pr,
+            "pr_type": pr_type,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging live coach exercise: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Workout Plan & Progress API (Phase 4) ──────────────────────────────────
 
 @app.get("/api/workout-plan/{user_id}")

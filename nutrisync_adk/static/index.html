@@ -154,10 +154,26 @@
                     style="width: 100%; display: block;"></canvas>
             </div>
 
-            <div class="wizard-footer" style="justify-content: center; margin-top: 20px;">
+            <!-- Session Stats -->
+            <div id="coach-session-stats" class="coach-session-stats hidden">
+                <span id="coach-session-sets">Sets logged: 0</span>
+                <span id="coach-session-reps-display"></span>
+            </div>
+
+            <div class="wizard-footer" style="justify-content: center; margin-top: 20px; flex-wrap: wrap;">
                 <button type="button" id="start-coach-btn">Start Tracking</button>
                 <button type="button" id="stop-coach-btn" class="secondary-btn hidden">Stop</button>
+                <button type="button" id="log-exercise-btn" class="coach-log-btn hidden" disabled>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                    </svg>
+                    <span id="log-exercise-btn-text">Log Exercise</span>
+                </button>
             </div>
+
+            <!-- Toast Notification -->
+            <div id="coach-toast" class="coach-toast hidden"></div>
         </div>
     </div>
 
