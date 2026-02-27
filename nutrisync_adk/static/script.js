@@ -960,7 +960,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (error) throw error;
                 // ── PostHog: Track sign up ──
                 if (typeof posthog !== 'undefined') posthog.capture('user_signed_up', { method: 'email' });
-                authMessage.innerText = "Check your email for the confirmation link!";
+                // If email confirmation is enabled, user needs to check their email.
+                // If disabled (e.g. during beta), session is returned immediately.
+                if (data.session) {
+                    // Auto-confirmed — onAuthStateChange will handle the rest
+                    authMessage.innerText = "Account created! Signing you in...";
+                } else {
+                    authMessage.innerText = "Check your email for the confirmation link!";
+                }
                 authMessage.classList.add("success");
             } else {
                 const { data, error } = await sbClient.auth.signInWithPassword({
