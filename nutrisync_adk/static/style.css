@@ -21,7 +21,9 @@ body {
     margin: 0;
     display: flex;
     justify-content: center;
+    align-items: flex-start;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
 }
 
@@ -35,7 +37,8 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    /* Or slightly less for floating effect */
+    max-height: 100vh;
+    max-height: 100dvh;
     box-shadow: var(--shadow-medium);
     position: relative;
 }
@@ -43,7 +46,9 @@ body {
 @media (min-width: 920px) {
     .chat-container {
         height: 95vh;
+        height: 95dvh;
         margin-top: 2.5vh;
+        margin-top: 2.5dvh;
         border-radius: 16px;
     }
 }

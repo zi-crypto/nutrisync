@@ -1635,10 +1635,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (currentStep === 4) {
-            // Days are auto-derived from split — just ensure split has at least one workout day
             const sport = document.getElementById('profile-sport').value;
             if (sport === 'Gym') {
                 updateDaysFromSplit(); // Sync one last time before advancing
+                // Ensure at least one non-rest day exists in the split
+                const splitInputs = document.querySelectorAll('.split-day-input');
+                const hasWorkoutDay = Array.from(splitInputs).some(input => {
+                    const v = input.value.trim().toLowerCase();
+                    return v && v !== 'rest' && v !== 'rest day';
+                });
+                if (!hasWorkoutDay) {
+                    alert("Your split must have at least one workout day (not just rest days).");
+                    return;
+                }
+            }
+            const days = parseInt(document.getElementById('profile-days').value);
+            if (!days || days < 1) {
+                alert("Workout days per week must be at least 1.");
+                document.getElementById('profile-days').value = 1;
+                return;
             }
         }
 
@@ -1712,7 +1727,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             target_weight_kg: parseFloat(document.getElementById('profile-target-weight').value) || null,
             fitness_goal: document.getElementById('profile-goal').value,
             experience_level: document.getElementById('profile-experience').value,
-            workout_days_per_week: parseInt(document.getElementById('profile-days').value),
+            workout_days_per_week: Math.max(1, parseInt(document.getElementById('profile-days').value) || 1),
 
             // New Fields
             sport_type: document.getElementById('profile-sport').value,

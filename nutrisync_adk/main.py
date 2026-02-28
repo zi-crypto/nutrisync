@@ -3,7 +3,7 @@ import os
 import time
 from typing import List, Optional
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from .runners import NutriSyncRunner
@@ -146,7 +146,7 @@ class ProfileRequest(BaseModel):
     fitness_goal: str
     experience_level: str
     equipment_access: str
-    workout_days_per_week: int
+    workout_days_per_week: int = Field(ge=1, le=14)
     typical_daily_calories: Optional[int] = None
     typical_diet_type: Optional[str] = None
     allergies: Optional[str] = None
@@ -287,8 +287,11 @@ async def update_profile(request: ProfileRequest):
         # Server-side: derive workout_days_per_week from split schedule for Gym users
         if split_schedule and data.get("sport_type") == "Gym":
             non_rest = [d for d in split_schedule if d.strip().lower() not in ("rest", "rest day")]
-            if non_rest:
-                data["workout_days_per_week"] = len(non_rest)
+            data["workout_days_per_week"] = len(non_rest) if non_rest else 1
+
+        # Clamp workout_days_per_week to at least 1
+        if data.get("workout_days_per_week", 1) < 1:
+            data["workout_days_per_week"] = 1
 
         # Calculate Targets
         targets = calculate_targets(data) 
