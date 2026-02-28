@@ -136,7 +136,8 @@ async def submit_feedback(request: FeedbackRequest):
 # Profile API
 class ProfileRequest(BaseModel):
     user_id: str
-    name: str 
+    name: str
+    coach_name: Optional[str] = "NutriSync"
     gender: str
     dob: str
     height_cm: int

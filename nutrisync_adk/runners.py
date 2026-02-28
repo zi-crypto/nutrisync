@@ -77,6 +77,7 @@ async def _build_instruction(ctx: ReadonlyContext) -> str:
     result = result.replace("{one_rm_records}", one_rm_records)
     result = result.replace("{split_structure}", split_structure)
     result = result.replace("{workout_plan}", workout_plan)
+    result = result.replace("{coach_name}", ctx.state.get("coach_name", "NutriSync"))
 
     return result
 
@@ -196,8 +197,13 @@ class NutriSyncRunner:
         ctx_duration_ms = int((time.time() - ctx_start) * 1000)
 
         # 2. Prepare session state with fresh context
+        # Extract coach_name from profile for prompt substitution
+        profile_data = context_data.get("profile", {})
+        coach_name = profile_data.get("coach_name") or "NutriSync"
+
         state_updates = {
-            "user_profile": json.dumps(context_data.get("profile", {}), indent=2, default=str),
+            "coach_name": coach_name,
+            "user_profile": json.dumps(profile_data, indent=2, default=str),
             "daily_totals": json.dumps(context_data.get("daily_totals", {}), indent=2, default=str),
             "current_time": context_data.get("current_time", "Unknown"),
             "active_notes": self._format_notes(context_data.get("active_notes", [])),

@@ -1704,6 +1704,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const formData = {
             user_id: userId,
             name: document.getElementById('profile-name').value,
+            coach_name: document.getElementById('profile-coach-name').value.trim() || 'NutriSync',
             gender: document.getElementById('profile-gender').value,
             dob: document.getElementById('profile-dob').value,
             height_cm: parseInt(document.getElementById('profile-height').value),
@@ -1830,6 +1831,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (profile) {
                     // Populate Form
                     document.getElementById('profile-name').value = profile.name || "";
+                    document.getElementById('profile-coach-name').value = profile.coach_name || "NutriSync";
                     document.getElementById('profile-gender').value = profile.gender || "Male";
                     document.getElementById('profile-dob').value = profile.dob || "";
                     document.getElementById('profile-height').value = profile.height_cm || "";
