@@ -376,17 +376,8 @@
                     </div>
                 </div>
 
-                <!-- Step 4: Logistics -->
+                <!-- Step 4: Sport & Activity -->
                 <div class="wizard-step hidden" data-step="4">
-
-                    <div class="form-group">
-                        <label for="profile-days">Workout Days / Week</label>
-                        <input type="number" id="profile-days" min="1" max="7" value="3">
-                    </div>
-                </div>
-
-                <!-- Step 5: Sport & Activity -->
-                <div class="wizard-step hidden" data-step="5">
                     <div class="form-group">
                         <label for="profile-sport">Main Activity / Sport</label>
                         <select id="profile-sport" class="form-select">
@@ -396,6 +387,11 @@
                             <option value="Cycling">Cycling</option>
                             <option value="Other">Other</option>
                         </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="profile-days">Workout Days / Week</label>
+                        <input type="number" id="profile-days" min="1" max="14" value="3">
                     </div>
 
                     <!-- Gym-Specific: Split Editor -->
@@ -409,6 +405,7 @@
                                 <option value="Full Body">Full Body</option>
                                 <option value="Arnold Split">Arnold Split</option>
                                 <option value="PPL x2">PPL x2 (6-Day)</option>
+                                <option value="PPL + Rest (8-Day)">PPL + Rest (8-Day)</option>
                                 <option value="Custom">Custom</option>
                             </select>
                         </div>
@@ -465,8 +462,8 @@
                     </div>
                 </div>
 
-                <!-- Step 6: Nutrition -->
-                <div class="wizard-step hidden" data-step="6">
+                <!-- Step 5: Nutrition -->
+                <div class="wizard-step hidden" data-step="5">
                     <div class="form-group">
                         <label for="profile-diet-type">Typical Diet Type</label>
                         <select id="profile-diet-type" class="form-select">
@@ -492,6 +489,7 @@
                 </div>
 
                 <div class="wizard-footer">
+                    <button type="button" id="wizard-cancel-btn" class="secondary-btn" style="margin-right:auto;color:rgba(255,255,255,0.5);">Cancel</button>
                     <button type="button" id="wizard-back-btn" class="secondary-btn hidden">Back</button>
                     <button type="button" id="wizard-next-btn">Next</button>
                     <button type="submit" id="wizard-submit-btn" class="hidden">Finish</button>

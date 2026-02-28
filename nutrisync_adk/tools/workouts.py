@@ -1,10 +1,27 @@
 import logging
 import json
+import re
 from typing import Optional, List, Dict, Any
 from ..tools.utils import get_supabase_client, calculate_log_timestamp, get_today_date_str
 from ..user_context import current_user_id
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_SUFFIX_RE = re.compile(r'\s*\((?:1st|2nd|3rd|\d+(?:st|nd|rd|th)|first|second|third)\)\s*$', re.IGNORECASE)
+
+def _normalize_day_name(name: str) -> str:
+    """Strip ordinal suffixes like ' (1st)', ' (2nd)' and lowercase for matching.
+    
+    Examples:
+        'Chest & Back (2nd)' -> 'chest & back'
+        'Push'               -> 'push'
+        'Legs (1st)'         -> 'legs'
+    """
+    return _SUFFIX_RE.sub('', name).strip().lower()
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +74,58 @@ def log_workout(
         if response.data:
             row = response.data[0]
             workout_log_id = row.get("id")
+
+            # ── Advance split position if this workout matches a split day ──
+            try:
+                split_resp = (supabase.table("workout_splits")
+                              .select("id, last_completed_order_index")
+                              .eq("user_id", user_id)
+                              .eq("is_active", True)
+                              .limit(1)
+                              .execute())
+
+                if split_resp.data:
+                    split_row = split_resp.data[0]
+                    split_id = split_row["id"]
+                    last_idx = split_row["last_completed_order_index"] or 0
+
+                    items_resp = (supabase.table("split_items")
+                                  .select("order_index, workout_name")
+                                  .eq("split_id", split_id)
+                                  .order("order_index")
+                                  .execute())
+                    items = items_resp.data or []
+
+                    if items:
+                        total = len(items)
+                        norm_type = _normalize_day_name(workout_type)
+
+                        # Collect all positions whose normalised name matches
+                        matching_positions = [
+                            it["order_index"] for it in items
+                            if _normalize_day_name(it["workout_name"]) == norm_type
+                        ]
+
+                        if matching_positions:
+                            # Disambiguate duplicates (e.g. PPL x2 has two "Push" days)
+                            # Pick the NEXT matching position in the cycle after last_idx
+                            chosen = None
+                            for pos in matching_positions:
+                                if pos > last_idx:
+                                    chosen = pos
+                                    break
+                            # Wrap-around: if all matches are <= last_idx, take the first
+                            if chosen is None:
+                                chosen = matching_positions[0]
+
+                            supabase.rpc("advance_split_position", {
+                                "p_user_id": user_id,
+                                "p_order_index": chosen,
+                            }).execute()
+            except Exception as adv_err:
+                # Non-fatal — don't break workout logging if split advance fails
+                logger.warning(f"Split advance failed for user {user_id}: {adv_err}")
+
             return (
                 f"Successfully logged {workout_type} ({duration_minutes} min, {calories_burned} kcal). "
                 f"workout_log_id={workout_log_id} — use this to link exercise sets via log_exercise_sets."
@@ -201,70 +270,6 @@ SPLIT_MUSCLE_MAP = {
 }
 
 
-def _get_user_plan_context() -> Dict[str, Any]:
-    """Shared helper: fetches user profile, equipment, 1RM records, and active split for plan generation."""
-    user_id = current_user_id.get()
-    if not user_id:
-        raise ValueError("No user context.")
-
-    supabase = get_supabase_client()
-
-    # Fetch profile
-    profile_resp = supabase.table("user_profile").select("*").eq("user_id", user_id).limit(1).execute()
-    profile = profile_resp.data[0] if profile_resp.data else {}
-
-    # Fetch equipment
-    equip_resp = supabase.table("user_equipment").select("equipment_name, category").eq("user_id", user_id).execute()
-    equipment = [row["equipment_name"] for row in (equip_resp.data or [])]
-
-    # Fetch 1RM records
-    orm_resp = supabase.table("user_1rm_records").select("exercise_name, weight_kg").eq("user_id", user_id).execute()
-    one_rm = {row["exercise_name"]: row["weight_kg"] for row in (orm_resp.data or [])}
-
-    # Fetch active split + items
-    split_resp = supabase.table("workout_splits").select("id, name").eq("user_id", user_id).eq("is_active", True).limit(1).execute()
-    active_split = split_resp.data[0] if split_resp.data else None
-
-    split_items = []
-    if active_split:
-        items_resp = (supabase.table("split_items")
-                      .select("order_index, workout_name")
-                      .eq("split_id", active_split["id"])
-                      .order("order_index")
-                      .execute())
-        split_items = items_resp.data or []
-
-    return {
-        "user_id": user_id,
-        "profile": profile,
-        "equipment": equipment,
-        "one_rm": one_rm,
-        "active_split": active_split,
-        "split_items": split_items,
-    }
-
-
-def _compute_volume_and_reps(experience_level: str, fitness_goal: str, muscle_group: str, sessions_per_week: int) -> Dict[str, Any]:
-    """Computes target sets per session and rep range for a muscle group."""
-    exp = (experience_level or "intermediate").lower()
-    goal = (fitness_goal or "build muscle").lower()
-
-    vol_map = VOLUME_TABLE.get(exp, VOLUME_TABLE["intermediate"])
-    weekly_sets = vol_map.get(muscle_group, vol_map["default"])
-    sets_per_session = max(2, min(8, -(-weekly_sets // max(1, sessions_per_week))))  # ceiling div, clamp 2-8
-
-    rep_cfg = GOAL_REP_RANGES.get(goal, GOAL_REP_RANGES["build muscle"])
-
-    return {
-        "weekly_sets": weekly_sets,
-        "sets_per_session": sets_per_session,
-        "rep_low": rep_cfg["rep_low"],
-        "rep_high": rep_cfg["rep_high"],
-        "load_low": rep_cfg["load_low"],
-        "load_high": rep_cfg["load_high"],
-    }
-
-
 def generate_workout_plan(
     exercises_json: str,
 ) -> str:
@@ -334,6 +339,33 @@ def generate_workout_plan(
             return "Error: No active workout split found. Please set up a workout split first."
 
         split_id = split_resp.data[0]["id"]
+
+        # ── Validate split_day_name against actual split_items ──────────
+        items_resp = (supabase.table("split_items")
+                      .select("workout_name")
+                      .eq("split_id", split_id)
+                      .execute())
+        valid_names_raw = [row["workout_name"] for row in (items_resp.data or [])]
+        # Build normalized set for matching (skip rest days)
+        valid_normalized = {
+            _normalize_day_name(n) for n in valid_names_raw
+            if _normalize_day_name(n) not in ('rest', 'rest day')
+        }
+        # Also keep a display-friendly list of valid non-rest names
+        valid_display = [n for n in valid_names_raw if _normalize_day_name(n) not in ('rest', 'rest day')]
+
+        invalid_days = set()
+        for ex in exercises:
+            norm = _normalize_day_name(ex["split_day_name"])
+            if norm not in ('rest', 'rest day') and norm not in valid_normalized:
+                invalid_days.add(ex["split_day_name"])
+
+        if invalid_days:
+            return (
+                f"Error: Invalid split_day_name(s): {sorted(invalid_days)}. "
+                f"Valid days for this split are: {valid_display}. "
+                f"Please re-generate using the EXACT day names from the user's split."
+            )
 
         # Delete existing plan for this split (full replacement)
         supabase.table("workout_plan_exercises").delete().eq("user_id", user_id).eq("split_id", split_id).execute()

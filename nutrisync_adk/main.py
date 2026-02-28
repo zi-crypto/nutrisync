@@ -282,7 +282,13 @@ async def update_profile(request: ProfileRequest):
         split_schedule = data.pop("split_schedule", None)
         one_rm_records = data.pop("one_rm_records", None)
         equipment_list = data.pop("equipment_list", None)
-        
+
+        # Server-side: derive workout_days_per_week from split schedule for Gym users
+        if split_schedule and data.get("sport_type") == "Gym":
+            non_rest = [d for d in split_schedule if d.strip().lower() not in ("rest", "rest day")]
+            if non_rest:
+                data["workout_days_per_week"] = len(non_rest)
+
         # Calculate Targets
         targets = calculate_targets(data) 
         data.update(targets)
@@ -411,9 +417,9 @@ async def update_profile(request: ProfileRequest):
 # ── Live Coach Exercise Logging ─────────────────────────────────────────────
 
 LIVE_COACH_EXERCISE_MAP = {
-    "squat": "Bodyweight Squat",
-    "pushup": "Push-up",
-    "pullup": "Pull-up",
+    "squat": "Bodyweight Squats",
+    "pushup": "Push-ups",
+    "pullup": "Pull-ups",
 }
 
 class LiveCoachLogRequest(BaseModel):

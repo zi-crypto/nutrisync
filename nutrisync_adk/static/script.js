@@ -725,9 +725,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const coachToast = document.getElementById('coach-toast');
 
     const COACH_EXERCISE_LABELS = {
-        'squat': 'Bodyweight Squat',
-        'pushup': 'Push-up',
-        'pullup': 'Pull-up'
+        'squat': 'Bodyweight Squats',
+        'pushup': 'Push-ups',
+        'pullup': 'Pull-ups'
     };
 
     function getCoachReps() {
@@ -996,16 +996,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Onboarding Logic ---
     let currentStep = 1;
-    const totalSteps = 6; // Updated to 6 (Sport/Split added)
+    const totalSteps = 5; // Updated: merged Workout Days into Sport step
 
     // Split Templates
     const splitTemplates = {
         "PPL": ["Push", "Pull", "Legs", "Rest"],
         "Bro Split": ["Chest", "Back", "Legs", "Shoulders", "Arms", "Rest", "Rest"],
-        "Upper Lower": ["Upper", "Lower", "Rest", "Upper", "Lower", "Rest", "Rest"],
-        "Full Body": ["Full Body A", "Rest", "Full Body B", "Rest", "Full Body A", "Rest", "Rest"],
-        "Arnold Split": ["Chest & Back", "Shoulders & Arms", "Legs", "Chest & Back", "Shoulders & Arms", "Legs", "Rest"],
-        "PPL x2": ["Push", "Pull", "Legs", "Push", "Pull", "Legs", "Rest"],
+        "Upper Lower": ["Upper (1st)", "Lower (1st)", "Rest", "Upper (2nd)", "Lower (2nd)", "Rest", "Rest"],
+        "Full Body": ["Full Body A", "Rest", "Full Body B", "Rest", "Full Body C", "Rest", "Rest"],
+        "Arnold Split": ["Chest & Back (1st)", "Shoulders & Arms (1st)", "Legs (1st)", "Chest & Back (2nd)", "Shoulders & Arms (2nd)", "Legs (2nd)", "Rest"],
+        "PPL x2": ["Push (1st)", "Pull (1st)", "Legs (1st)", "Push (2nd)", "Pull (2nd)", "Legs (2nd)", "Rest"],
+        "PPL + Rest (8-Day)": ["Push", "Pull", "Legs", "Rest", "Push (2nd)", "Pull (2nd)", "Legs (2nd)", "Rest"],
         "Custom": ["Day 1"]
     };
 
@@ -1060,25 +1061,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             removeBtn.onclick = () => {
                 row.remove();
                 checkSplitLimit();
+                updateDaysFromSplit();
             };
+
+            // Sync days count whenever user edits a day name
+            input.addEventListener('input', () => updateDaysFromSplit());
 
             row.appendChild(input);
             row.appendChild(removeBtn);
             container.appendChild(row);
         });
         checkSplitLimit();
+        updateDaysFromSplit();
     }
 
     function checkSplitLimit() {
         const container = document.getElementById('split-editor-container');
         const addBtn = document.getElementById('add-split-day-btn');
-        if (container.children.length >= 7) {
+        if (container.children.length >= 14) {
             addBtn.disabled = true;
-            addBtn.innerText = "Max 7 Days Reached";
+            addBtn.innerText = "Max 14 Days Reached";
         } else {
             addBtn.disabled = false;
             addBtn.innerText = "+ Add Day";
         }
+    }
+
+    // Auto-derive workout_days_per_week from split editor (non-rest count)
+    function updateDaysFromSplit() {
+        const inputs = document.querySelectorAll('.split-day-input');
+        let workoutCount = 0;
+        inputs.forEach(input => {
+            const dayName = input.value.trim().toLowerCase();
+            if (dayName && dayName !== 'rest' && dayName !== 'rest day') {
+                workoutCount++;
+            }
+        });
+        const daysInput = document.getElementById('profile-days');
+        if (daysInput) daysInput.value = workoutCount || 1;
     }
 
     // --- 1RM Editor Functions ---
@@ -1411,12 +1431,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (profileSport) {
         profileSport.addEventListener('change', () => {
+            const daysInput = document.getElementById('profile-days');
             if (profileSport.value === 'Gym') {
                 gymOptions.style.display = 'block';
+                if (daysInput) { daysInput.readOnly = true; daysInput.title = 'Auto-derived from your split schedule'; }
+                updateDaysFromSplit();
             } else {
                 gymOptions.style.display = 'none';
+                if (daysInput) { daysInput.readOnly = false; daysInput.title = ''; }
             }
         });
+        // Apply on load
+        if (profileSport.value === 'Gym') {
+            const daysInput = document.getElementById('profile-days');
+            if (daysInput) { daysInput.readOnly = true; daysInput.title = 'Auto-derived from your split schedule'; }
+        }
     }
 
     const profileSplitTemplate = document.getElementById('profile-split-template');
@@ -1424,8 +1453,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         profileSplitTemplate.addEventListener('change', () => {
             const template = profileSplitTemplate.value;
             if (splitTemplates[template]) {
-                const days = splitTemplates[template].slice(0, 7); // Ensure template respects limit
-                renderSplitEditor(days);
+                renderSplitEditor(splitTemplates[template]);
+                updateDaysFromSplit();
             }
         });
     }
@@ -1446,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (addSplitDayBtn) {
         addSplitDayBtn.addEventListener('click', () => {
             const container = document.getElementById('split-editor-container');
-            if (container.children.length >= 7) return;
+            if (container.children.length >= 14) return;
 
             const count = container.children.length + 1;
 
@@ -1471,12 +1500,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             removeBtn.onclick = () => {
                 row.remove();
                 checkSplitLimit();
+                updateDaysFromSplit();
             };
+
+            // Sync days count when user edits the new day name
+            input.addEventListener('input', () => updateDaysFromSplit());
 
             row.appendChild(input);
             row.appendChild(removeBtn);
             container.appendChild(row);
             checkSplitLimit();
+            updateDaysFromSplit();
         });
     }
 
@@ -1600,26 +1634,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        if (currentStep === 5) {
+        if (currentStep === 4) {
+            // Days are auto-derived from split — just ensure split has at least one workout day
             const sport = document.getElementById('profile-sport').value;
             if (sport === 'Gym') {
-                const targetDays = parseInt(document.getElementById('profile-days').value) || 0;
-                // Only validate if we have input fields (some sports might not)
-                const inputs = document.querySelectorAll('.split-day-input');
-                if (inputs.length > 0) {
-                    let workoutCount = 0;
-                    inputs.forEach(input => {
-                        const dayName = input.value.trim().toLowerCase();
-                        if (dayName && dayName !== 'rest' && dayName !== 'rest day') {
-                            workoutCount++;
-                        }
-                    });
-
-                    if (workoutCount !== targetDays) {
-                        alert(`You selected ${targetDays} workout days per week, but your schedule defines ${workoutCount} workouts.\n\nPlease ensure you have exactly ${targetDays} workout days defined (mark others as "Rest").`);
-                        return;
-                    }
-                }
+                updateDaysFromSplit(); // Sync one last time before advancing
             }
         }
 
@@ -1630,8 +1649,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (typeof posthog !== 'undefined') {
                 posthog.capture('onboarding_step_viewed', { step: currentStep, total_steps: totalSteps });
             }
-            // Trigger calc if moving to step 6
-            if (currentStep === 6) estimateCalories();
+            // Trigger calc if moving to step 5
+            if (currentStep === 5) estimateCalories();
         }
     });
 
@@ -1641,6 +1660,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             showStep(currentStep);
         }
     });
+
+    // Cancel Button — close settings without saving
+    const wizardCancelBtn = document.getElementById('wizard-cancel-btn');
+    if (wizardCancelBtn) {
+        wizardCancelBtn.addEventListener('click', () => {
+            onboardingOverlay.classList.add('hidden');
+            currentStep = 1;
+        });
+    }
 
     onboardingForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1763,6 +1791,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // If empty or missing name, show onboarding
             if (!profile || !profile.name) {
                 console.log("Profile incomplete, showing onboarding.");
+                if (wizardCancelBtn) wizardCancelBtn.classList.add('hidden');
                 onboardingOverlay.classList.remove('hidden');
                 currentStep = 1;
                 showStep(1);
@@ -1846,6 +1875,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // Show Wizard
                     document.getElementById('wizard-title').innerText = "Update Profile";
+                    if (wizardCancelBtn) wizardCancelBtn.classList.remove('hidden');
                     onboardingOverlay.classList.remove('hidden');
                     currentStep = 1;
                     showStep(1);

@@ -58,6 +58,7 @@ async def _build_instruction(ctx: ReadonlyContext) -> str:
     equipment_list = ctx.state.get("equipment_list", "None")
     one_rm_records = ctx.state.get("one_rm_records", "None")
     workout_plan = ctx.state.get("workout_plan", "None")
+    split_structure = ctx.state.get("split_structure", "No active split")
 
     # DEBUG: Log all state keys and equipment value
     all_keys = list(ctx.state.keys()) if hasattr(ctx.state, 'keys') else "NOT A DICT"
@@ -74,6 +75,7 @@ async def _build_instruction(ctx: ReadonlyContext) -> str:
     result = result.replace("{active_notes}", active_notes)
     result = result.replace("{equipment_list}", equipment_list)
     result = result.replace("{one_rm_records}", one_rm_records)
+    result = result.replace("{split_structure}", split_structure)
     result = result.replace("{workout_plan}", workout_plan)
 
     return result
@@ -201,6 +203,7 @@ class NutriSyncRunner:
             "active_notes": self._format_notes(context_data.get("active_notes", [])),
             "equipment_list": ", ".join(context_data.get("equipment_list", [])) or "None specified",
             "one_rm_records": json.dumps(context_data.get("one_rm_records", []), indent=2, default=str) if context_data.get("one_rm_records") else "None recorded",
+            "split_structure": self._format_split_structure(context_data.get("split_structure", [])),
             "workout_plan": json.dumps(context_data.get("workout_plan", []), indent=2, default=str) if context_data.get("workout_plan") else "No plan generated yet",
         }
         logger.info(f"Equipment context for {user_id}: {state_updates['equipment_list']}")
@@ -314,3 +317,22 @@ class NutriSyncRunner:
         if not notes:
             return "None"
         return "\n".join(f"- {note}" for note in notes)
+
+    @staticmethod
+    def _format_split_structure(split_items: list) -> str:
+        """Format split_items list into a readable string for the prompt.
+        
+        Example output:
+            Split: PPL
+            1. Push
+            2. Pull
+            3. Legs
+            4. Rest
+        """
+        if not split_items:
+            return "No active split"
+        split_name = split_items[0].get("split_name", "Custom Split") if split_items else ""
+        lines = [f"Split: {split_name}"]
+        for item in split_items:
+            lines.append(f"{item['position']}. {item['day']}")
+        return "\n".join(lines)

@@ -35,11 +35,12 @@ class ContextService:
             task_equipment = self._fetch_user_equipment(user_id)
             task_1rm = self._fetch_1rm_records(user_id)
             task_plan = self._fetch_workout_plan(user_id)
+            task_split = self._fetch_split_structure(user_id)
 
             # Execute all in parallel
             results = await asyncio.gather(
                 task_profile, task_goals, task_notes, task_equipment,
-                task_1rm, task_plan,
+                task_1rm, task_plan, task_split,
                 return_exceptions=True,
             )
             
@@ -50,6 +51,7 @@ class ContextService:
             equipment_list = results[3] if not isinstance(results[3], Exception) else []
             one_rm_records = results[4] if not isinstance(results[4], Exception) else []
             workout_plan = results[5] if not isinstance(results[5], Exception) else []
+            split_structure = results[6] if not isinstance(results[6], Exception) else []
             
             if isinstance(results[0], Exception): logger.error(f"Error fetching profile: {results[0]}")
             if isinstance(results[1], Exception): logger.error(f"Error fetching goals: {results[1]}")
@@ -57,6 +59,7 @@ class ContextService:
             if isinstance(results[3], Exception): logger.error(f"Error fetching equipment: {results[3]}")
             if isinstance(results[4], Exception): logger.error(f"Error fetching 1RM records: {results[4]}")
             if isinstance(results[5], Exception): logger.error(f"Error fetching workout plan: {results[5]}")
+            if isinstance(results[6], Exception): logger.error(f"Error fetching split structure: {results[6]}")
 
             # Current Time String
             now = get_current_functional_time()
@@ -71,6 +74,7 @@ class ContextService:
                 "equipment_list": equipment_list,
                 "one_rm_records": one_rm_records,
                 "workout_plan": workout_plan,
+                "split_structure": split_structure,
             }
 
         except Exception as e:
@@ -84,6 +88,7 @@ class ContextService:
                 "equipment_list": [],
                 "one_rm_records": [],
                 "workout_plan": [],
+                "split_structure": [],
             }
 
     async def _fetch_user_profile(self, user_id: str) -> Dict[str, Any]:
@@ -189,6 +194,37 @@ class ContextService:
                .order("exercise_order")
                .execute())
         return res.data if res.data else []
+
+    # ── Split Structure ────────────────────────────────────────────────────
+    async def _fetch_split_structure(self, user_id: str) -> List[Dict[str, Any]]:
+        return await asyncio.to_thread(self._fetch_split_structure_sync, user_id)
+
+    def _fetch_split_structure_sync(self, user_id: str) -> List[Dict[str, Any]]:
+        """Fetch split_items for the user's active split, ordered by position."""
+        split_res = (self.supabase.table("workout_splits")
+                     .select("id, name")
+                     .eq("user_id", user_id)
+                     .eq("is_active", True)
+                     .limit(1)
+                     .execute())
+        if not split_res.data:
+            return []
+
+        split_id = split_res.data[0]["id"]
+        split_name = split_res.data[0]["name"]
+
+        items_res = (self.supabase.table("split_items")
+                     .select("order_index, workout_name")
+                     .eq("split_id", split_id)
+                     .order("order_index")
+                     .execute())
+        if not items_res.data:
+            return []
+
+        return [
+            {"position": row["order_index"], "day": row["workout_name"], "split_name": split_name}
+            for row in items_res.data
+        ]
 
     def _get_empty_goals(self) -> Dict[str, Any]:
         return {
