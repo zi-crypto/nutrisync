@@ -45,6 +45,7 @@ class ChatRequest(BaseModel):
     message: str
     guest_id: str
     image: Optional[str] = None
+    language: Optional[str] = "en"
 
 class FeedbackRequest(BaseModel):
     message_id: int
@@ -74,7 +75,7 @@ async def chat_endpoint(request: ChatRequest):
             logger.error(f"Failed to decode image: {e}")
 
     # Process
-    response = await runner.process_message(request.guest_id, request.message, image_bytes=image_bytes, mime_type=mime_type)
+    response = await runner.process_message(request.guest_id, request.message, image_bytes=image_bytes, mime_type=mime_type, language=request.language)
 
     # ── PostHog: Track chat API call ──
     latency_ms = int((time.time() - start_time) * 1000)
@@ -98,10 +99,10 @@ async def get_history(guest_id: str, after: Optional[str] = None):
 async def submit_feedback(request: FeedbackRequest):
     try:
         if len(request.feedback_comment.strip()) < 10:
-            raise HTTPException(status_code=400, detail="Feedback comment must be at least 10 characters long.")
+            raise HTTPException(status_code=400, detail="error.feedback_comment_short")
         
         if request.feedback_value not in (1, -1):
-            raise HTTPException(status_code=400, detail="Feedback value must be 1 (like) or -1 (dislike).")
+            raise HTTPException(status_code=400, detail="error.feedback_value_invalid")
             
         data = {
             "message_id": request.message_id,
@@ -138,6 +139,7 @@ class ProfileRequest(BaseModel):
     user_id: str
     name: str
     coach_name: Optional[str] = "NutriSync"
+    language: Optional[str] = "en"
     gender: str
     dob: str
     height_cm: int
@@ -443,7 +445,7 @@ async def log_live_coach_exercise(request: LiveCoachLogRequest):
         )
 
         if request.reps <= 0:
-            raise HTTPException(status_code=400, detail="Reps must be greater than 0.")
+            raise HTTPException(status_code=400, detail="error.reps_zero")
 
         # Resolve weight — use provided value or fallback to user's body weight
         weight_kg = request.weight_kg
@@ -514,7 +516,7 @@ async def log_live_coach_exercise(request: LiveCoachLogRequest):
 
         insert_resp = runner.supabase.table("exercise_logs").insert(row).execute()
         if not insert_resp.data:
-            raise HTTPException(status_code=500, detail="Failed to insert exercise log.")
+            raise HTTPException(status_code=500, detail="error.exercise_log_failed")
 
         # ── PostHog: Track live coach exercise log ──
         posthog_capture(request.user_id, "api_live_coach_logged", {

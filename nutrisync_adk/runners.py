@@ -25,20 +25,21 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # ── Prompt Template ──────────────────────────────────────────────────────────
-_PROMPT_TEMPLATE: str = ""
+_PROMPT_TEMPLATES: Dict[str, str] = {}
 
-def _load_prompt_template() -> str:
-    """Load the system prompt template once at module import time."""
-    global _PROMPT_TEMPLATE
-    if not _PROMPT_TEMPLATE:
-        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', 'system.md')
+def _load_prompt_template(lang: str = "en") -> str:
+    """Load the system prompt template for the given language."""
+    global _PROMPT_TEMPLATES
+    if lang not in _PROMPT_TEMPLATES:
+        suffix = f"_{lang}" if lang != "en" else ""
+        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', f'system{suffix}.md')
         try:
             with open(prompt_path, 'r', encoding='utf-8') as f:
-                _PROMPT_TEMPLATE = f.read()
+                _PROMPT_TEMPLATES[lang] = f.read()
         except Exception as e:
-            logger.error(f"Error loading system prompt template: {e}")
-            _PROMPT_TEMPLATE = "You are a helpful NutriSync coach."
-    return _PROMPT_TEMPLATE
+            logger.warning(f"No prompt for lang={lang}, falling back to English: {e}")
+            return _load_prompt_template("en")
+    return _PROMPT_TEMPLATES[lang]
 
 
 # ── InstructionProvider ──────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ async def _build_instruction(ctx: ReadonlyContext) -> str:
     request-scoped ReadonlyContext. Reads pre-populated session.state
     values and injects them into the static prompt template.
     """
-    template = _load_prompt_template()
+    template = _load_prompt_template(ctx.state.get("language", "en"))
 
     # Read pre-populated state (set in process_message before run_async)
     user_profile = ctx.state.get("user_profile", "{}")
@@ -167,7 +168,7 @@ class NutriSyncRunner:
             )
         return session
 
-    async def process_message(self, user_id: str, text: str, image_bytes: bytes = None, mime_type: str = None) -> dict:
+    async def process_message(self, user_id: str, text: str, image_bytes: bytes = None, mime_type: str = None, language: str = "en") -> dict:
         """Process a user message and return the response."""
         try:
             # 0. Set Context Variable for Tools
@@ -175,7 +176,7 @@ class NutriSyncRunner:
             try:
                 # Acquire per-user lock to prevent stale session errors
                 async with self._get_user_lock(user_id):
-                    return await self._process_message_impl(user_id, text, image_bytes, mime_type)
+                    return await self._process_message_impl(user_id, text, image_bytes, mime_type, language)
             finally:
                 current_user_id.reset(token)
 
@@ -187,7 +188,7 @@ class NutriSyncRunner:
                 "message_id": None,
             }
 
-    async def _process_message_impl(self, user_id: str, text: str, image_bytes: bytes = None, mime_type: str = None) -> dict:
+    async def _process_message_impl(self, user_id: str, text: str, image_bytes: bytes = None, mime_type: str = None, language: str = "en") -> dict:
         """Internal implementation — runs under per-user lock."""
         process_start = time.time()
 
@@ -202,6 +203,7 @@ class NutriSyncRunner:
         coach_name = profile_data.get("coach_name") or "NutriSync"
 
         state_updates = {
+            "language": language,
             "coach_name": coach_name,
             "user_profile": json.dumps(profile_data, indent=2, default=str),
             "daily_totals": json.dumps(context_data.get("daily_totals", {}), indent=2, default=str),

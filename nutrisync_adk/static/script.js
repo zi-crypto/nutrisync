@@ -280,7 +280,8 @@ class ChatApp {
             const payload = {
                 guest_id: this.userId,
                 message: text,
-                image: image
+                image: image,
+                language: window.getLang ? window.getLang() : 'en'
             };
 
             const response = await fetch(this.API_URL, {
@@ -309,7 +310,7 @@ class ChatApp {
         } catch (error) {
             console.error('Send Error:', error);
             this.hideTypingIndicator();
-            this.appendMessage('model', `**Error**: Failed to communicate with the server. (${error.message})`);
+            this.appendMessage('model', `**${t('chat.error')}**`);
             // ── PostHog: Track chat error ──
             if (typeof posthog !== 'undefined') {
                 posthog.capture('chat_message_error', { error: error.message });
@@ -457,7 +458,7 @@ class ChatApp {
         this.chatHistory.innerHTML = '';
         const welcome = document.createElement('div');
         welcome.className = 'message bot-message';
-        welcome.innerText = "Hello! I'm your NutriSync coach. How can I help you today?";
+        welcome.innerText = t('chat.welcome');
         this.chatHistory.appendChild(welcome);
     }
 
@@ -467,7 +468,7 @@ class ChatApp {
         const trigger = document.createElement('button');
         trigger.className = 'feedback-trigger';
         trigger.setAttribute('data-message-id', messageId);
-        trigger.title = 'Give feedback';
+        trigger.title = t('header.title.give_feedback');
         trigger.innerHTML = `
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
@@ -499,28 +500,28 @@ class ChatApp {
         const existingValue = trigger ? trigger.getAttribute('data-feedback-value') : null;
 
         popup.innerHTML = `
-            <div class="feedback-header">Rate this response</div>
+            <div class="feedback-header">${t('feedback.header')}</div>
             <div class="feedback-buttons">
-                <button class="feedback-btn feedback-btn-like ${existingValue === '1' ? 'active' : ''}" data-value="1" title="Like">
+                <button class="feedback-btn feedback-btn-like ${existingValue === '1' ? 'active' : ''}" data-value="1" title="${t('feedback.like')}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"></path>
                         <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
                     </svg>
-                    <span>Like</span>
+                    <span>${t('feedback.like')}</span>
                 </button>
-                <button class="feedback-btn feedback-btn-dislike ${existingValue === '-1' ? 'active' : ''}" data-value="-1" title="Dislike">
+                <button class="feedback-btn feedback-btn-dislike ${existingValue === '-1' ? 'active' : ''}" data-value="-1" title="${t('feedback.dislike')}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"></path>
                         <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
                     </svg>
-                    <span>Dislike</span>
+                    <span>${t('feedback.dislike')}</span>
                 </button>
             </div>
             <div class="feedback-comment-section" style="display: none;">
-                <textarea class="feedback-textarea" placeholder="Tell us what was helpful or what went wrong..." minlength="10"></textarea>
+                <textarea class="feedback-textarea" placeholder="${t('feedback.placeholder')}" minlength="10"></textarea>
                 <div class="feedback-comment-footer">
-                    <span class="feedback-char-count">0 / 10 min</span>
-                    <button class="feedback-submit-btn" disabled>Submit</button>
+                    <span class="feedback-char-count">${t('feedback.char_count', {count: 0})}</span>
+                    <button class="feedback-submit-btn" disabled>${t('feedback.submit')}</button>
                 </div>
                 <div class="feedback-error" style="display: none;"></div>
             </div>
@@ -529,7 +530,7 @@ class ChatApp {
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
-                <span>Thanks for your feedback!</span>
+                <span>${t('feedback.thanks')}</span>
             </div>
         `;
 
@@ -569,7 +570,7 @@ class ChatApp {
         // Character counter and validation
         textarea.addEventListener('input', () => {
             const len = textarea.value.trim().length;
-            charCount.textContent = `${len} / 10 min`;
+            charCount.textContent = t('feedback.char_count', {count: len});
             submitBtn.disabled = len < 10;
             if (len >= 10) {
                 charCount.classList.add('valid');
@@ -584,14 +585,14 @@ class ChatApp {
             e.stopPropagation();
             const comment = textarea.value.trim();
             if (comment.length < 10) {
-                errorDiv.textContent = 'Please write at least 10 characters.';
+                errorDiv.textContent = t('validation.feedback_min_chars');
                 errorDiv.style.display = 'block';
                 return;
             }
             if (!selectedValue) return;
 
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Sending...';
+            submitBtn.textContent = t('feedback.sending');
 
             const success = await this.submitFeedback(messageId, selectedValue, comment);
 
@@ -614,10 +615,10 @@ class ChatApp {
                     this.activeFeedbackPopup = null;
                 }, 1500);
             } else {
-                errorDiv.textContent = 'Failed to save feedback. Please try again.';
+                errorDiv.textContent = t('feedback.error');
                 errorDiv.style.display = 'block';
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit';
+                submitBtn.textContent = t('feedback.submit');
             }
         });
 
@@ -707,10 +708,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             <line x1="21" y1="12" x2="9" y2="12"></line>
         </svg>
     `;
-    logoutBtn.title = "Sign Out";
-    logoutBtn.style.marginLeft = "auto";
+    logoutBtn.title = t('header.title.sign_out');
+    logoutBtn.style.marginInlineStart = "auto";
     logoutBtn.addEventListener('click', handleLogout);
     document.querySelector('header').appendChild(logoutBtn);
+
+    // --- Language Switcher ---
+    const langSwitcher = document.getElementById('lang-switcher');
+    if (langSwitcher) {
+        langSwitcher.value = window.getLang ? window.getLang() : 'en';
+        langSwitcher.addEventListener('change', () => {
+            if (window.setLang) window.setLang(langSwitcher.value);
+        });
+    }
 
     // --- Live Coach Logic ---
     let liveCoachSystem = null;
@@ -725,9 +735,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const coachToast = document.getElementById('coach-toast');
 
     const COACH_EXERCISE_LABELS = {
-        'squat': 'Bodyweight Squats',
-        'pushup': 'Push-ups',
-        'pullup': 'Pull-ups'
+        'squat': t('coach.exercise_label.squat'),
+        'pushup': t('coach.exercise_label.pushup'),
+        'pullup': t('coach.exercise_label.pullup')
     };
 
     function getCoachReps() {
@@ -744,9 +754,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (reps > 0) {
             logExerciseBtn.classList.remove('hidden');
             logExerciseBtn.disabled = false;
-            logExerciseBtnText.textContent = `Log ${reps} rep${reps !== 1 ? 's' : ''} — ${exLabel}`;
+            logExerciseBtnText.textContent = t('coach.log_text', {reps, exercise: exLabel});
         } else {
-            logExerciseBtnText.textContent = 'Log Exercise';
+            logExerciseBtnText.textContent = t('coach.btn.log');
             logExerciseBtn.disabled = true;
         }
     }
@@ -774,7 +784,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Reset session stats when opening
             coachSetsLogged = 0;
             if (coachSessionStats) coachSessionStats.classList.add('hidden');
-            if (coachSessionSets) coachSessionSets.textContent = 'Sets logged: 0';
+            if (coachSessionSets) coachSessionSets.textContent = t('coach.label.sets_logged', {count: 0});
             updateLogButton();
         });
     }
@@ -833,7 +843,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 logExerciseBtn.disabled = true;
                 coachSetsLogged = 0;
                 if (coachSessionStats) coachSessionStats.classList.add('hidden');
-                if (coachSessionSets) coachSessionSets.textContent = 'Sets logged: 0';
+                if (coachSessionSets) coachSessionSets.textContent = t('coach.label.sets_logged', {count: 0});
             }
         });
     }
@@ -846,16 +856,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             const userId = window.app ? window.app.userId : null;
 
             if (!userId) {
-                showCoachToast('Not signed in. Please sign in first.', false);
+                showCoachToast(t('coach.toast.not_signed_in'), false);
                 return;
             }
             if (reps <= 0) {
-                showCoachToast('No reps to log. Do some reps first!', false);
+                showCoachToast(t('coach.toast.no_reps'), false);
                 return;
             }
 
             logExerciseBtn.disabled = true;
-            logExerciseBtnText.textContent = 'Logging...';
+            logExerciseBtnText.textContent = t('coach.btn.logging');
 
             try {
                 const resp = await fetch('/api/live-coach/log', {
@@ -873,10 +883,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (resp.ok && data.success) {
                     coachSetsLogged++;
                     const prMsg = data.is_pr
-                        ? ` 🏆 NEW ${data.pr_type.toUpperCase()} PR!`
+                        ? ` 🏆 ${t('coach.toast.new_pr', {type: data.pr_type.toUpperCase()})}`
                         : '';
                     showCoachToast(
-                        `Set ${data.set_number} logged: ${data.reps} reps × ${data.weight_kg}kg${prMsg}`,
+                        t('coach.toast.set_logged', {set: data.set_number, reps: data.reps, weight: data.weight_kg}) + prMsg,
                         true
                     );
                     // ── PostHog: Track live coach exercise logged ──
@@ -893,26 +903,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // Update session stats
                     coachSessionStats.classList.remove('hidden');
-                    coachSessionSets.textContent = `Sets logged: ${coachSetsLogged}`;
-                    coachSessionRepsDisplay.textContent = `Last: ${data.reps} reps`;
+                    coachSessionSets.textContent = t('coach.label.sets_logged', {count: coachSetsLogged});
+                    coachSessionRepsDisplay.textContent = t('coach.label.last_reps', {reps: data.reps});
 
                     // Reset rep counter for next set
                     if (liveCoachSystem && liveCoachSystem.exerciseEngine && liveCoachSystem.exerciseEngine.currentProfile) {
                         liveCoachSystem.exerciseEngine.currentProfile.reps = 0;
-                        liveCoachSystem.exerciseEngine.currentProfile.feedback = "Ready";
+                        liveCoachSystem.exerciseEngine.currentProfile.feedback = t('coach.feedback.ready');
                         if (liveCoachSystem.exerciseEngine.currentProfile.state !== 'SETUP') {
                             liveCoachSystem.exerciseEngine.currentProfile.state = 'UP';
                         }
                     }
 
-                    logExerciseBtnText.textContent = 'Log Exercise';
+                    logExerciseBtnText.textContent = t('coach.btn.log');
                     logExerciseBtn.disabled = true;
                 } else {
-                    showCoachToast(data.detail || 'Failed to log exercise.', false);
+                    showCoachToast(t(data.detail) || t('coach.log_failed'), false);
                     updateLogButton();
                 }
             } catch (err) {
-                showCoachToast('Network error. Please try again.', false);
+                showCoachToast(t('coach.toast.network_error'), false);
                 updateLogButton();
             }
         });
@@ -925,15 +935,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     authToggleBtn.addEventListener('click', () => {
         isSignUp = !isSignUp;
         if (isSignUp) {
-            authTitle.innerText = "Create Account";
-            authSubmitBtn.innerText = "Sign Up";
-            authToggleText.innerText = "Already have an account?";
-            authToggleBtn.innerText = "Sign In";
+            authTitle.innerText = t('auth.title.signup');
+            authSubmitBtn.innerText = t('auth.btn.signup');
+            authToggleText.innerText = t('auth.toggle.has_account');
+            authToggleBtn.innerText = t('auth.btn.signin');
         } else {
-            authTitle.innerText = "Welcome Back";
-            authSubmitBtn.innerText = "Sign In";
-            authToggleText.innerText = "Don't have an account?";
-            authToggleBtn.innerText = "Sign Up";
+            authTitle.innerText = t('auth.title.welcome_back');
+            authSubmitBtn.innerText = t('auth.btn.signin');
+            authToggleText.innerText = t('auth.toggle.no_account');
+            authToggleBtn.innerText = t('auth.btn.signup');
         }
         authMessage.innerText = "";
     });
@@ -944,14 +954,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const email = emailInput.value;
         const password = passwordInput.value;
 
-        authMessage.innerText = "Processing...";
+        authMessage.innerText = t('auth.msg.processing');
         authMessage.className = "auth-message";
 
         try {
             if (isSignUp) {
                 // Validate Password Strength briefly (client side)
                 if (password.length < 8) {
-                    throw new Error("Password must be at least 8 characters");
+                    throw new Error(t('auth.msg.password_short'));
                 }
                 const { data, error } = await sbClient.auth.signUp({
                     email: email,
@@ -964,9 +974,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // If disabled (e.g. during beta), session is returned immediately.
                 if (data.session) {
                     // Auto-confirmed — onAuthStateChange will handle the rest
-                    authMessage.innerText = "Account created! Signing you in...";
+                    authMessage.innerText = t('auth.msg.account_created');
                 } else {
-                    authMessage.innerText = "Check your email for the confirmation link!";
+                    authMessage.innerText = t('auth.msg.check_email');
                 }
                 authMessage.classList.add("success");
             } else {
@@ -1000,14 +1010,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Split Templates
     const splitTemplates = {
-        "PPL": ["Push", "Pull", "Legs", "Rest"],
-        "Bro Split": ["Chest", "Back", "Legs", "Shoulders", "Arms", "Rest", "Rest"],
-        "Upper Lower": ["Upper (1st)", "Lower (1st)", "Rest", "Upper (2nd)", "Lower (2nd)", "Rest", "Rest"],
-        "Full Body": ["Full Body A", "Rest", "Full Body B", "Rest", "Full Body C", "Rest", "Rest"],
-        "Arnold Split": ["Chest & Back (1st)", "Shoulders & Arms (1st)", "Legs (1st)", "Chest & Back (2nd)", "Shoulders & Arms (2nd)", "Legs (2nd)", "Rest"],
-        "PPL x2": ["Push (1st)", "Pull (1st)", "Legs (1st)", "Push (2nd)", "Pull (2nd)", "Legs (2nd)", "Rest"],
-        "PPL + Rest (8-Day)": ["Push", "Pull", "Legs", "Rest", "Push (2nd)", "Pull (2nd)", "Legs (2nd)", "Rest"],
-        "Custom": ["Day 1"]
+        "PPL": [t('splits.push'), t('splits.pull'), t('splits.legs'), t('splits.rest')],
+        "Bro Split": [t('splits.chest'), t('splits.back'), t('splits.legs'), t('splits.shoulders'), t('splits.arms'), t('splits.rest'), t('splits.rest')],
+        "Upper Lower": [t('splits.upper_1'), t('splits.lower_1'), t('splits.rest'), t('splits.upper_2'), t('splits.lower_2'), t('splits.rest'), t('splits.rest')],
+        "Full Body": [t('splits.full_body_a'), t('splits.rest'), t('splits.full_body_b'), t('splits.rest'), t('splits.full_body_c'), t('splits.rest'), t('splits.rest')],
+        "Arnold Split": [t('splits.chest_back_1'), t('splits.shoulders_arms_1'), t('splits.legs_1'), t('splits.chest_back_2'), t('splits.shoulders_arms_2'), t('splits.legs_2'), t('splits.rest')],
+        "PPL x2": [t('splits.push_1'), t('splits.pull_1'), t('splits.legs_1'), t('splits.push_2'), t('splits.pull_2'), t('splits.legs_2'), t('splits.rest')],
+        "PPL + Rest (8-Day)": [t('splits.push'), t('splits.pull'), t('splits.legs'), t('splits.rest'), t('splits.push_2'), t('splits.pull_2'), t('splits.legs_2'), t('splits.rest')],
+        "Custom": [t('splits.day_n', {n: 1})]
     };
 
     function showStep(step) {
@@ -1029,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             wizardSubmitBtn.classList.add('hidden');
         }
 
-        wizardSubtitle.innerText = `Step ${step} of ${totalSteps}`;
+        wizardSubtitle.innerText = t('wizard.step_of', {current: step, total: totalSteps});
     }
 
     // Split Editor Functions
@@ -1048,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             input.type = 'text';
             input.value = day;
             input.className = 'split-day-input';
-            input.placeholder = `Day ${index + 1}`;
+            input.placeholder = t('wizard.label.split_day', {n: index + 1});
             input.style.flex = '1';
 
             const removeBtn = document.createElement('button');
@@ -1080,10 +1090,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const addBtn = document.getElementById('add-split-day-btn');
         if (container.children.length >= 14) {
             addBtn.disabled = true;
-            addBtn.innerText = "Max 14 Days Reached";
+            addBtn.innerText = t('wizard.btn.max_days');
         } else {
             addBtn.disabled = false;
-            addBtn.innerText = "+ Add Day";
+            addBtn.innerText = t('wizard.btn.add_day');
         }
     }
 
@@ -1123,14 +1133,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         nameInput.type = 'text';
         nameInput.value = exerciseName;
         nameInput.className = 'rm-exercise-input';
-        nameInput.placeholder = `Exercise (e.g. Squat)`;
+        nameInput.placeholder = t('wizard.placeholder.1rm_exercise');
         nameInput.style.flex = '2';
 
         const weightInput = document.createElement('input');
         weightInput.type = 'number';
         weightInput.value = weightKg;
         weightInput.className = 'rm-weight-input';
-        weightInput.placeholder = `Weight (kg)`;
+        weightInput.placeholder = t('wizard.placeholder.1rm_weight');
         weightInput.step = '0.5';
         weightInput.style.flex = '1';
 
@@ -1260,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const label = document.createElement('span');
             label.className = 'equip-category-label';
-            label.textContent = category;
+            label.textContent = t('equipment.category.' + category.toLowerCase().replace(/[^a-z0-9]+/g, '_')) || category;
             block.appendChild(label);
 
             const chipsWrap = document.createElement('div');
@@ -1310,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             customBlock.dataset.custom = "true";
             const label = document.createElement('span');
             label.className = 'equip-category-label';
-            label.textContent = 'Custom';
+            label.textContent = t('equipment.category.custom');
             customBlock.appendChild(label);
             const chipsWrap = document.createElement('div');
             chipsWrap.className = 'equip-category-chips';
@@ -1363,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!btn) return;
         const allNames = getAllPresetNamesForTier(tier);
         const allSelected = [...allNames].every(n => selectedEquipment.has(n));
-        btn.textContent = allSelected ? '✅ All Selected' : '✅ Select All';
+        btn.textContent = allSelected ? t('wizard.btn.all_selected') : t('wizard.btn.select_all');
     }
 
     // ── Equipment Event Listeners ──
@@ -1434,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const daysInput = document.getElementById('profile-days');
             if (profileSport.value === 'Gym') {
                 gymOptions.style.display = 'block';
-                if (daysInput) { daysInput.readOnly = true; daysInput.title = 'Auto-derived from your split schedule'; }
+                if (daysInput) { daysInput.readOnly = true; daysInput.title = t('profile.days_auto_derived'); }
                 updateDaysFromSplit();
             } else {
                 gymOptions.style.display = 'none';
@@ -1444,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Apply on load
         if (profileSport.value === 'Gym') {
             const daysInput = document.getElementById('profile-days');
-            if (daysInput) { daysInput.readOnly = true; daysInput.title = 'Auto-derived from your split schedule'; }
+            if (daysInput) { daysInput.readOnly = true; daysInput.title = t('profile.days_auto_derived'); }
         }
     }
 
@@ -1486,7 +1496,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const input = document.createElement('input');
             input.type = 'text';
-            input.value = `Day ${count}`;
+            input.value = t('splits.day_n', {n: count});
             input.className = 'split-day-input';
             input.style.flex = '1';
 
@@ -1587,21 +1597,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const dob = new Date(dobStr);
                 const today = new Date();
                 if (dob >= today) {
-                    alert("Date of birth cannot be in the future.");
+                    alert(t('validation.dob_future'));
                     return;
                 }
                 const age = today.getFullYear() - dob.getFullYear();
                 if (age < 10 || age > 120) {
-                    alert("Please enter a valid date of birth (Age 10-120).");
+                    alert(t('validation.dob_range'));
                     return;
                 }
             }
             if (height && (height < 50 || height > 300)) {
-                alert("Please enter a valid height in cm (50-300).");
+                alert(t('validation.height_range'));
                 return;
             }
             if (weight && (weight < 20 || weight > 500)) {
-                alert("Please enter a valid weight in kg (20-500).");
+                alert(t('validation.weight_range'));
                 return;
             }
         }
@@ -1616,19 +1626,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (goal !== 'Maintain' && targetWeightInput.hasAttribute('required') && !targetWeight) {
                 targetWeightInput.style.borderColor = '#f85149';
                 valid = false;
-                alert("Please enter a Target Weight for your goal.");
+                alert(t('validation.target_weight_required'));
                 return;
             }
 
             if (goal === 'Lose Weight' && targetWeight && currentWeight) {
                 if (targetWeight >= currentWeight) {
-                    alert("For 'Lose Weight', your target must be lower than your current weight.");
+                    alert(t('validation.target_lower'));
                     return;
                 }
             }
             if (goal === 'Build Muscle' && targetWeight && currentWeight) {
                 if (targetWeight <= currentWeight) {
-                    alert("For 'Build Muscle', your target must be higher than your current weight.");
+                    alert(t('validation.target_higher'));
                     return;
                 }
             }
@@ -1645,13 +1655,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return v && v !== 'rest' && v !== 'rest day';
                 });
                 if (!hasWorkoutDay) {
-                    alert("Your split must have at least one workout day (not just rest days).");
+                    alert(t('validation.split_no_workout'));
                     return;
                 }
             }
             const days = parseInt(document.getElementById('profile-days').value);
             if (!days || days < 1) {
-                alert("Workout days per week must be at least 1.");
+                alert(t('validation.days_min'));
                 document.getElementById('profile-days').value = 1;
                 return;
             }
@@ -1691,7 +1701,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Final Validation (Step 6)
         const calories = parseInt(document.getElementById('profile-calories').value);
         if (calories && (calories < 500 || calories > 10000)) {
-            alert("Please enter a realistic daily calorie estimate (500 - 10,000).");
+            alert(t('validation.calories_range'));
             return;
         }
 
@@ -1720,6 +1730,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             user_id: userId,
             name: document.getElementById('profile-name').value,
             coach_name: document.getElementById('profile-coach-name').value.trim() || 'NutriSync',
+            language: window.getLang ? window.getLang() : 'en',
             gender: document.getElementById('profile-gender').value,
             dob: document.getElementById('profile-dob').value,
             height_cm: parseInt(document.getElementById('profile-height').value),
@@ -1750,7 +1761,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            wizardSubmitBtn.innerText = "Saving...";
+            wizardSubmitBtn.innerText = t('wizard.btn.saving');
             const response = await fetch('/api/profile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1786,16 +1797,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             }
 
-            let msg = `Profile saved! Welcome, ${formData.name}.`;
+            let msg = t('profile.saved', {name: formData.name});
             if (resData.targets) {
-                msg += `\nCalorie Target: ${resData.targets.daily_calorie_target} kcal`;
+                msg += '\n' + t('profile.calorie_target', {calories: resData.targets.daily_calorie_target});
             }
             alert(msg);
 
         } catch (error) {
             console.error("Profile Save Error:", error);
-            alert("Error saving profile: " + error.message);
-            wizardSubmitBtn.innerText = "Finish";
+            alert(t('profile.save_error', {error: error.message}));
+            wizardSubmitBtn.innerText = t('wizard.btn.finish');
         }
     });
 
@@ -1891,7 +1902,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('profile-allergies').value = profile.allergies || "";
 
                     // Show Wizard
-                    document.getElementById('wizard-title').innerText = "Update Profile";
+                    document.getElementById('wizard-title').innerText = t('wizard.title.update');
                     if (wizardCancelBtn) wizardCancelBtn.classList.remove('hidden');
                     onboardingOverlay.classList.remove('hidden');
                     currentStep = 1;
@@ -2016,7 +2027,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         workoutTrackerOverlay.classList.add('hidden');
                         const input = document.getElementById('user-input');
                         if (input) {
-                            input.value = 'Please regenerate my workout plan for all split days based on my current profile, equipment, and 1RM records.';
+                            input.value = t('tracker.plan.regenerate_prompt');
                             window.app.sendMessage();
                         }
                     }
@@ -2043,8 +2054,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!this.planData || !this.planData.plan || this.planData.plan.length === 0) {
                 document.getElementById('wt-exercise-list').innerHTML = `
                     <div class="wt-empty-state">
-                        <p>No workout plan yet.</p>
-                        <p style="color:#8b949e;font-size:0.85rem;">Ask the AI coach to generate a plan for you, or click Regenerate Plan.</p>
+                        <p>${t('tracker.plan.empty')}</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">${t('tracker.plan.empty_hint')}</p>
                     </div>`;
                 document.getElementById('wt-volume-summary').style.display = 'none';
                 return;
@@ -2083,7 +2094,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const exercises = this.planData.plan.filter(e => e.split_day_name === dayName);
 
             if (exercises.length === 0) {
-                list.innerHTML = '<div class="wt-empty-state"><p>No exercises for this day.</p></div>';
+                list.innerHTML = `<div class="wt-empty-state"><p>${t('tracker.plan.no_exercises')}</p></div>`;
                 summaryEl.style.display = 'none';
                 return;
             }
@@ -2100,18 +2111,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 card.setAttribute('data-exercise', ex.exercise_name);
 
                 const isCompound = (ex.exercise_type || '').toLowerCase() === 'compound';
-                const typeLabel = isCompound ? '🏋️ Compound' : '🎯 Isolation';
+                const typeLabel = isCompound ? t('tracker.plan.compound') : t('tracker.plan.isolation');
                 const typeClass = isCompound ? 'wt-ex-type-compound' : 'wt-ex-type-isolation';
 
                 const muscles = (ex.target_muscles || []).join(', ');
                 const repRange = `${ex.sets}×${ex.rep_range_low}-${ex.rep_range_high}`;
                 const loadText = ex.load_percentage ? ` @ ${Math.round(ex.load_percentage * 100)}% 1RM` : '';
-                const restText = ex.rest_seconds ? `Rest: ${ex.rest_seconds >= 120 ? (ex.rest_seconds / 60) + ' min' : ex.rest_seconds + 's'}` : '';
+                const restText = ex.rest_seconds ? `${t('tracker.plan.rest')} ${ex.rest_seconds >= 120 ? (ex.rest_seconds / 60) + ' ' + t('time.min') : ex.rest_seconds + t('time.seconds_short')}` : '';
 
                 // Superset badge
                 let supersetHtml = '';
                 if (ex.superset_group != null) {
-                    supersetHtml = `<span class="wt-superset-badge">🔗 Superset ${ex.superset_group}</span>`;
+                    supersetHtml = `<span class="wt-superset-badge">${t('tracker.plan.superset', {group: ex.superset_group})}</span>`;
                 }
 
                 card.innerHTML = `
@@ -2125,11 +2136,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ${restText ? `<span class="wt-ex-detail">${restText}</span>` : ''}
                         ${supersetHtml}
                     </div>
-                    <div class="wt-ex-muscles">Muscles: <span>${muscles}</span></div>
+                    <div class="wt-ex-muscles">${t('tracker.plan.muscles')} <span>${muscles}</span></div>
                     ${ex.notes ? `<div class="wt-ex-detail" style="margin-top:4px;font-size:0.8rem;color:rgba(255,255,255,0.4);">📝 ${ex.notes}</div>` : ''}
                     <div class="wt-ex-ghost">
-                        <div class="wt-ex-ghost-title">Last Session</div>
-                        <div class="wt-ex-ghost-sets" data-exercise-ghost="${ex.exercise_name}">Loading...</div>
+                        <div class="wt-ex-ghost-title">${t('tracker.plan.last_session')}</div>
+                        <div class="wt-ex-ghost-sets" data-exercise-ghost="${ex.exercise_name}">${t('tracker.plan.loading')}</div>
                     </div>
                 `;
 
@@ -2156,9 +2167,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Volume summary
             if (Object.keys(muscleSetCount).length > 0) {
                 const parts = Object.entries(muscleSetCount)
-                    .map(([m, s]) => `<strong>${this._capitalize(m)}</strong> ${s} sets`)
+                    .map(([m, s]) => `<strong>${this._capitalize(m)}</strong> ${s} ${t('units.sets')}`)
                     .join(' &nbsp;|&nbsp; ');
-                summaryEl.innerHTML = `📊 Volume Summary: ${parts}`;
+                summaryEl.innerHTML = `📊 ${t('tracker.plan.volume_summary')} ${parts}`;
                 summaryEl.style.display = 'block';
             } else {
                 summaryEl.style.display = 'none';
@@ -2181,26 +2192,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                     this.exerciseHistory[exerciseName] = data;
                     this._renderGhostSets(data, el);
                 } else {
-                    el.textContent = 'No previous session data.';
+                    el.textContent = t('tracker.plan.no_prev_data');
                 }
             } catch (e) {
-                el.textContent = 'Could not load history.';
+                el.textContent = t('tracker.plan.could_not_load');
                 console.error('Ghost load error:', e);
             }
         }
 
         _renderGhostSets(data, el) {
             if (!data || !data.weekly_trend || data.weekly_trend.length === 0) {
-                el.textContent = 'No previous session data.';
+                el.textContent = t('tracker.plan.no_prev_data');
                 return;
             }
             const latest = data.weekly_trend[data.weekly_trend.length - 1];
             const parts = [];
-            if (latest.best_weight) parts.push(`Best: ${latest.best_weight}kg`);
-            if (latest.best_reps) parts.push(`× ${latest.best_reps} reps`);
-            if (latest.total_volume) parts.push(`Vol: ${Math.round(latest.total_volume).toLocaleString()}kg`);
-            if (latest.total_sets) parts.push(`${latest.total_sets} sets`);
-            el.textContent = parts.length > 0 ? parts.join(' · ') : 'No data.';
+            if (latest.best_weight) parts.push(`${t('tracker.progress.best')} ${latest.best_weight}${t('units.kg')}`);
+            if (latest.best_reps) parts.push(`× ${latest.best_reps} ${t('units.reps')}`);
+            if (latest.total_volume) parts.push(`${t('tracker.progress.vol')} ${Math.round(latest.total_volume).toLocaleString()}${t('units.kg')}`);
+            if (latest.total_sets) parts.push(`${latest.total_sets} ${t('units.sets')}`);
+            el.textContent = parts.length > 0 ? parts.join(' · ') : t('tracker.plan.no_data');
         }
 
         // ═══════════════════ PROGRESS TAB ═══════════════════
@@ -2294,7 +2305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 data: {
                     labels,
                     datasets: [{
-                        label: 'Est. 1RM (kg)',
+                        label: t('tracker.progress.chart_e1rm'),
                         data: e1rmValues,
                         borderColor: '#58a6ff',
                         backgroundColor: 'rgba(88,166,255,0.1)',
@@ -2334,7 +2345,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 data: {
                     labels,
                     datasets: [{
-                        label: 'Volume (kg)',
+                        label: t('tracker.progress.chart_volume'),
                         data: volValues,
                         backgroundColor: 'rgba(63,185,80,0.5)',
                         borderColor: '#3fb950',
@@ -2347,12 +2358,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         _chartOptions(unit) {
+            const isRtl = window.getDir && window.getDir() === 'rtl';
             return {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: { display: false, rtl: isRtl },
                     tooltip: {
+                        rtl: isRtl,
                         backgroundColor: 'rgba(22,27,34,0.95)',
                         titleColor: '#c9d1d9',
                         bodyColor: '#8b949e',
@@ -2364,10 +2377,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 scales: {
                     x: {
+                        reverse: isRtl,
                         grid: { color: 'rgba(255,255,255,0.04)' },
                         ticks: { color: '#8b949e', font: { size: 11 } }
                     },
                     y: {
+                        position: isRtl ? 'right' : 'left',
                         grid: { color: 'rgba(255,255,255,0.04)' },
                         ticks: {
                             color: '#8b949e',
@@ -2391,18 +2406,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Show last 5 weeks of data as "sessions"
             const recentWeeks = trend.slice(-5).reverse();
-            let html = '<h3 class="wt-chart-title" style="margin-bottom:10px;">📅 Session History</h3>';
+            let html = `<h3 class="wt-chart-title" style="margin-bottom:10px;">${t('tracker.progress.session_history')}</h3>`;
 
             recentWeeks.forEach(w => {
                 const prHtml = w.has_pr ? ' <span class="wt-all-ex-pr-badge">🏆 PR</span>' : '';
                 html += `
                     <div class="wt-session-card">
-                        <div class="wt-session-date">Week of ${w.week_start}${prHtml}</div>
+                        <div class="wt-session-date">${t('tracker.progress.week_of', {date: w.week_start})}${prHtml}</div>
                         <div class="wt-session-sets">
-                            <span class="wt-set-pill${w.has_pr ? ' wt-pr-set' : ''}">Best: ${w.best_weight || 0}kg × ${w.best_reps || 0}</span>
-                            <span class="wt-set-pill">Vol: ${Math.round(w.total_volume || 0).toLocaleString()}kg</span>
-                            <span class="wt-set-pill">${w.total_sets || 0} sets</span>
-                            ${w.best_e1rm ? `<span class="wt-set-pill">e1RM: ${w.best_e1rm}kg</span>` : ''}
+                            <span class="wt-set-pill${w.has_pr ? ' wt-pr-set' : ''}">${t('tracker.progress.best')} ${w.best_weight || 0}${t('units.kg')} × ${w.best_reps || 0}</span>
+                            <span class="wt-set-pill">${t('tracker.progress.vol')} ${Math.round(w.total_volume || 0).toLocaleString()}${t('units.kg')}</span>
+                            <span class="wt-set-pill">${w.total_sets || 0} ${t('units.sets')}</span>
+                            ${w.best_e1rm ? `<span class="wt-set-pill">${t('tracker.progress.e1rm')} ${w.best_e1rm}${t('units.kg')}</span>` : ''}
                         </div>
                     </div>`;
             });
@@ -2421,16 +2436,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             container.style.display = 'block';
 
-            let html = '<div class="wt-pr-title">🏆 Personal Records</div>';
+            let html = `<div class="wt-pr-title">${t('tracker.pr.title')}</div>`;
 
             if (pr.best_e1rm) {
-                html += `<div class="wt-pr-item"><span class="wt-pr-label">Best Est. 1RM:</span> <span class="wt-pr-value">${pr.best_e1rm}kg</span></div>`;
+                html += `<div class="wt-pr-item"><span class="wt-pr-label">${t('tracker.pr.best_e1rm')}</span> <span class="wt-pr-value">${pr.best_e1rm}${t('units.kg')}</span></div>`;
             }
             if (pr.best_weight) {
-                html += `<div class="wt-pr-item"><span class="wt-pr-label">Best Set:</span> <span class="wt-pr-value">${pr.best_weight.weight_kg}kg × ${pr.best_weight.reps}</span></div>`;
+                html += `<div class="wt-pr-item"><span class="wt-pr-label">${t('tracker.pr.best_set')}</span> <span class="wt-pr-value">${pr.best_weight.weight_kg}${t('units.kg')} × ${pr.best_weight.reps}</span></div>`;
             }
             if (pr.best_volume_set) {
-                html += `<div class="wt-pr-item"><span class="wt-pr-label">Best Volume (set):</span> <span class="wt-pr-value">${Math.round(pr.best_volume_set.volume_load || 0).toLocaleString()}kg</span></div>`;
+                html += `<div class="wt-pr-item"><span class="wt-pr-label">${t('tracker.pr.best_volume_set')}</span> <span class="wt-pr-value">${Math.round(pr.best_volume_set.volume_load || 0).toLocaleString()}${t('units.kg')}</span></div>`;
             }
 
             container.innerHTML = html;
@@ -2444,8 +2459,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (exercises.length === 0) {
                 container.innerHTML = `
                     <div class="wt-empty-state">
-                        <p>No exercise data yet.</p>
-                        <p style="color:#8b949e;font-size:0.85rem;">Start logging sets via the AI coach to see your progress.</p>
+                        <p>${t('tracker.progress.empty')}</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">${t('tracker.progress.empty_hint')}</p>
                     </div>`;
                 return;
             }
@@ -2464,15 +2479,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="wt-all-ex-stats">
                         <div class="wt-all-ex-stat">
                             <span class="wt-all-ex-stat-val">${ex.total_sets}</span>
-                            sets
+                            ${t('units.sets')}
                         </div>
                         <div class="wt-all-ex-stat">
                             <span class="wt-all-ex-stat-val">${Math.round(ex.total_volume).toLocaleString()}</span>
-                            vol (kg)
+                            ${t('tracker.stat.vol_kg')}
                         </div>
                         <div class="wt-all-ex-stat">
-                            <span class="wt-all-ex-stat-val">${ex.best_weight}kg</span>
-                            best
+                            <span class="wt-all-ex-stat-val">${ex.best_weight}${t('units.kg')}</span>
+                            ${t('tracker.stat.best')}
                         </div>
                     </div>
                 `;
@@ -2538,9 +2553,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         _updateWeekLabel() {
             const label = document.getElementById('wt-week-label');
             if (!label) return;
-            if (this.weekOffset === 0) label.textContent = 'This Week';
-            else if (this.weekOffset === 1) label.textContent = 'Last Week';
-            else label.textContent = `${this.weekOffset}w ago`;
+            if (this.weekOffset === 0) label.textContent = t('tracker.volume.this_week');
+            else if (this.weekOffset === 1) label.textContent = t('tracker.volume.last_week');
+            else label.textContent = t('tracker.volume.weeks_ago', {n: this.weekOffset});
         }
 
         _renderMuscleBars() {
@@ -2551,8 +2566,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (volumes.length === 0) {
                 container.innerHTML = `
                     <div class="wt-empty-state">
-                        <p>No volume data yet.</p>
-                        <p style="color:#8b949e;font-size:0.85rem;">Log exercise sets to see your weekly muscle volume.</p>
+                        <p>${t('tracker.volume.empty')}</p>
+                        <p style="color:#8b949e;font-size:0.85rem;">${t('tracker.volume.empty_hint')}</p>
                     </div>`;
                 return;
             }
@@ -2587,7 +2602,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="wt-muscle-bar-track">
                         <div class="wt-muscle-bar-fill ${colorClass}" style="width:${overPct}%"></div>
                     </div>
-                    <span class="wt-muscle-count">${completed}/${target} sets</span>
+                    <span class="wt-muscle-count">${completed}/${target} ${t('units.sets')}</span>
                 `;
                 container.appendChild(row);
             });

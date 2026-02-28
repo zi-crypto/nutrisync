@@ -6,7 +6,7 @@
     --accent-color: #58a6ff;
     --bot-msg-bg: rgba(48, 54, 61, 0.6);
     --user-msg-bg: #1f6feb;
-    --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-family: 'Inter', 'Cairo', system-ui, -apple-system, sans-serif;
     --glass-border: 1px solid rgba(255, 255, 255, 0.1);
     --shadow-medium: 0 4px 30px rgba(0, 0, 0, 0.5);
 }
@@ -76,9 +76,9 @@ header {
 }
 
 .status {
-    margin-left: 20px;
+    margin-inline-start: 20px;
     /* Creates the gap between Logo and Online */
-    margin-right: 20px;
+    margin-inline-end: 20px;
     /* Creates the gap between Online and Username */
     font-size: 0.85rem;
     color: #3fb950;
@@ -96,6 +96,32 @@ header {
     border-radius: 50%;
     box-shadow: 0 0 8px rgba(63, 185, 80, 0.4);
 }
+
+/* ── RTL / Language ──────────────────────────────────────────────────────── */
+[dir=rtl] {
+    --font-family: 'Cairo', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.lang-switcher {
+    background: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    min-width: 52px;
+    text-align: center;
+}
+
+.lang-switcher:focus {
+    border-color: var(--accent-color);
+}
+
 
 .chat-history {
     flex: 1;
@@ -134,7 +160,7 @@ header {
 .bot-message {
     background-color: var(--bot-msg-bg);
     align-self: flex-start;
-    border-bottom-left-radius: 4px;
+    border-end-start-radius: 4px;
     border: var(--glass-border);
     color: #e6edf3;
 }
@@ -142,7 +168,7 @@ header {
 .user-message {
     background: linear-gradient(135deg, #1f6feb 0%, #1158c7 100%);
     align-self: flex-end;
-    border-bottom-right-radius: 4px;
+    border-end-end-radius: 4px;
     color: #fff;
     box-shadow: 0 4px 12px rgba(31, 111, 235, 0.25);
 }
@@ -179,7 +205,7 @@ header {
 .clear-image-btn {
     position: absolute;
     top: -8px;
-    right: -8px;
+    inset-inline-end: -8px;
     background: #f85149;
     color: white;
     border: 2px solid var(--bg-color);
@@ -287,7 +313,7 @@ button:hover {
 .message ul,
 .message ol {
     margin: 0 0 10px 0;
-    padding-left: 24px;
+    padding-inline-start: 24px;
 }
 
 .message code {
@@ -312,7 +338,7 @@ button:hover {
     padding: 12px 18px;
     background: var(--bot-msg-bg);
     border-radius: 18px;
-    border-bottom-left-radius: 4px;
+    border-end-start-radius: 4px;
     display: none;
     /* JS toggles */
     width: fit-content;
@@ -427,7 +453,7 @@ button:hover {
 
 .form-group {
     margin-bottom: 16px;
-    text-align: left;
+    text-align: start;
 }
 
 .form-group label {
@@ -553,6 +579,10 @@ button:hover {
     background-size: 12px;
 }
 
+[dir=rtl] .form-select {
+    background-position: left 16px center;
+}
+
 .form-group-row {
     display: flex;
     gap: 16px;
@@ -673,7 +703,7 @@ button:hover {
 }
 
 .equip-chip.custom-chip .remove-custom {
-    margin-left: 2px;
+    margin-inline-start: 2px;
     font-size: 0.9rem;
     color: rgba(248, 81, 73, 0.8);
     cursor: pointer;
@@ -699,7 +729,7 @@ button:hover {
 .feedback-trigger {
     position: absolute;
     bottom: -4px;
-    right: 8px;
+    inset-inline-end: 8px;
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -746,7 +776,7 @@ button:hover {
 .feedback-popup {
     position: absolute;
     top: calc(100% + 8px);
-    right: 0;
+    inset-inline-end: 0;
     width: 280px;
     background: rgba(22, 27, 34, 0.95);
     backdrop-filter: blur(16px);
@@ -919,7 +949,7 @@ button:hover {
 @media (max-width: 600px) {
     .feedback-popup {
         width: 240px;
-        right: -8px;
+        inset-inline-end: -8px;
         padding: 12px;
     }
 
@@ -941,13 +971,13 @@ button:hover {
     max-width: 720px;
     padding: 20px 24px 24px;
     position: relative;
-    text-align: left;
+    text-align: start;
 }
 
 .wt-close-btn {
     position: absolute;
     top: 14px;
-    right: 14px;
+    inset-inline-end: 14px;
     z-index: 10;
 }
 
@@ -1076,7 +1106,7 @@ button:hover {
     gap: 8px;
     max-height: 50vh;
     overflow-y: auto;
-    padding-right: 4px;
+    padding-inline-end: 4px;
 }
 
 .wt-exercise-card {
@@ -1190,7 +1220,7 @@ button:hover {
     padding: 8px 12px;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
-    border-left: 3px solid rgba(88, 166, 255, 0.3);
+    border-inline-start: 3px solid rgba(88, 166, 255, 0.3);
     display: none;
 }
 
@@ -1471,7 +1501,7 @@ button:hover {
     gap: 10px;
     max-height: 55vh;
     overflow-y: auto;
-    padding-right: 4px;
+    padding-inline-end: 4px;
 }
 
 .wt-muscle-row {
@@ -1528,7 +1558,7 @@ button:hover {
     min-width: 70px;
     font-size: 0.82rem;
     color: #8b949e;
-    text-align: right;
+    text-align: end;
     font-variant-numeric: tabular-nums;
 }
 
@@ -1569,7 +1599,7 @@ button:hover {
 .wt-legend-info {
     font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.35);
-    margin-left: auto;
+    margin-inline-start: auto;
 }
 
 /* ── PR Celebration Animation ─────────────────────────────────────────────── */

@@ -7,7 +7,9 @@
     <title>NutriSync - AI Coach</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- i18n engine (must load before other scripts) -->
+    <script src="/static/i18n.js"></script>
     <!-- Markdown Parser -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- KaTeX -->
@@ -53,10 +55,15 @@
 <body>
     <div class="chat-container">
         <header>
-            <div class="logo">NutriSync</div>
-            <div class="status">Online</div>
+            <div class="logo" data-i18n="header.logo">NutriSync</div>
+            <div class="status" data-i18n="header.status">Online</div>
             <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
-                <button id="workout-tracker-toggle-btn" class="icon-btn hidden" title="Workout Tracker">
+                <!-- Language Switcher -->
+                <select id="lang-switcher" class="lang-switcher" title="Language">
+                    <option value="en">EN</option>
+                    <option value="ar">عر</option>
+                </select>
+                <button id="workout-tracker-toggle-btn" class="icon-btn hidden" data-i18n-title="header.title.workout_tracker" title="Workout Tracker">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 20V10"></path>
@@ -64,7 +71,7 @@
                         <path d="M6 20v-6"></path>
                     </svg>
                 </button>
-                <button id="live-coach-toggle-btn" class="icon-btn hidden" title="Live Coach">
+                <button id="live-coach-toggle-btn" class="icon-btn hidden" data-i18n-title="header.title.live_coach" title="Live Coach">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M23 7l-7 5 7 5V7z"></path>
@@ -74,7 +81,7 @@
                 <div id="profile-section" class="profile-section hidden"
                     style="display: flex; align-items: center; gap: 10px;">
                     <span id="header-username" style="font-weight: 500;">User</span>
-                    <button id="settings-btn" class="icon-btn" title="Edit Profile">
+                    <button id="settings-btn" class="icon-btn" data-i18n-title="header.title.edit_profile" title="Edit Profile">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -89,7 +96,7 @@
 
         <div id="chat-history" class="chat-history">
             <!-- Messages will appear here -->
-            <div class="message bot-message">
+            <div class="message bot-message" data-i18n="chat.welcome">
                 Hello! I'm your NutriSync coach. How can I help you today?
             </div>
         </div>
@@ -101,7 +108,7 @@
             </div>
 
             <input type="file" id="file-input" accept="image/*" style="display: none;">
-            <button id="upload-btn" title="Upload Image">
+            <button id="upload-btn" data-i18n-title="header.title.upload_image" title="Upload Image">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <path
@@ -110,8 +117,8 @@
                 </svg>
             </button>
 
-            <textarea id="user-input" placeholder="Type your message..." rows="1"></textarea>
-            <button id="send-btn" title="Send">
+            <textarea id="user-input" data-i18n-placeholder="chat.placeholder" placeholder="Type your message..." rows="1"></textarea>
+            <button id="send-btn" data-i18n-title="header.title.send" title="Send">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -124,24 +131,24 @@
     <!-- Auth Overlay -->
     <div id="auth-overlay" class="auth-overlay">
         <div class="auth-box">
-            <h2 id="auth-title">Welcome to NutriSync</h2>
-            <p id="auth-subtitle">Sign in to continue</p>
+            <h2 id="auth-title" data-i18n="auth.title.signin">Welcome to NutriSync</h2>
+            <p id="auth-subtitle" data-i18n="auth.subtitle.signin">Sign in to continue</p>
 
             <form id="auth-form">
                 <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" placeholder="Enter your email" required>
+                    <label for="email" data-i18n="auth.label.email">Email</label>
+                    <input type="email" id="email" data-i18n-placeholder="auth.placeholder.email" placeholder="Enter your email" required>
                 </div>
                 <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" placeholder="Enter your password" required>
+                    <label for="password" data-i18n="auth.label.password">Password</label>
+                    <input type="password" id="password" data-i18n-placeholder="auth.placeholder.password" placeholder="Enter your password" required>
                 </div>
-                <button type="submit" id="auth-submit-btn">Sign In</button>
+                <button type="submit" id="auth-submit-btn" data-i18n="auth.btn.signin">Sign In</button>
             </form>
 
             <div class="auth-footer">
-                <span id="auth-toggle-text">Don't have an account?</span>
-                <button id="auth-toggle-btn">Sign Up</button>
+                <span id="auth-toggle-text" data-i18n="auth.toggle.no_account">Don't have an account?</span>
+                <button id="auth-toggle-btn" data-i18n="auth.btn.signup">Sign Up</button>
             </div>
             <div id="auth-message" class="auth-message"></div>
         </div>
@@ -150,22 +157,22 @@
     <!-- Live Coach Overlay -->
     <div id="live-coach-overlay" class="auth-overlay hidden">
         <div class="auth-box wizard-box" style="width: 95%; max-width: 700px; padding: 20px;">
-            <button id="close-coach-btn" class="icon-btn" style="position: absolute; top: 15px; right: 15px;">
+            <button id="close-coach-btn" class="icon-btn" style="position: absolute; top: 15px; inset-inline-end: 15px;">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
             </button>
-            <h2 id="coach-title">NutriSync Live Coach</h2>
-            <p id="coach-subtitle">Ensure your full body is visible in the camera.</p>
+            <h2 id="coach-title" data-i18n="coach.title">NutriSync Live Coach</h2>
+            <p id="coach-subtitle" data-i18n="coach.subtitle">Ensure your full body is visible in the camera.</p>
 
             <div style="text-align: center; margin-bottom: 10px;">
-                <label for="coach-exercise-select" style="margin-right: 10px; color: #E2E8F0;">Exercise:</label>
+                <label for="coach-exercise-select" style="margin-inline-end: 10px; color: #E2E8F0;" data-i18n="coach.label.exercise">Exercise:</label>
                 <select id="coach-exercise-select"
                     style="padding: 6px 12px; border-radius: 6px; background-color: #2D3748; color: white; border: 1px solid #4A5568;">
-                    <option value="squat">Squats</option>
-                    <option value="pushup">Pushups</option>
-                    <option value="pullup">Pullups / Lat Pulldown</option>
+                    <option value="squat" data-i18n="coach.exercise.squat">Squats</option>
+                    <option value="pushup" data-i18n="coach.exercise.pushup">Pushups</option>
+                    <option value="pullup" data-i18n="coach.exercise.pullup">Pullups / Lat Pulldown</option>
                 </select>
             </div>
 
@@ -183,14 +190,14 @@
             </div>
 
             <div class="wizard-footer" style="justify-content: center; margin-top: 20px; flex-wrap: wrap;">
-                <button type="button" id="start-coach-btn">Start Tracking</button>
-                <button type="button" id="stop-coach-btn" class="secondary-btn hidden">Stop</button>
+                <button type="button" id="start-coach-btn" data-i18n="coach.btn.start">Start Tracking</button>
+                <button type="button" id="stop-coach-btn" class="secondary-btn hidden" data-i18n="coach.btn.stop">Stop</button>
                 <button type="button" id="log-exercise-btn" class="coach-log-btn hidden" disabled>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-inline-end: 6px;">
                         <path d="M9 11l3 3L22 4"></path>
                         <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
                     </svg>
-                    <span id="log-exercise-btn-text">Log Exercise</span>
+                    <span id="log-exercise-btn-text" data-i18n="coach.btn.log">Log Exercise</span>
                 </button>
             </div>
 
@@ -211,16 +218,16 @@
 
             <!-- Tab Bar -->
             <div class="wt-tab-bar">
-                <button class="wt-tab active" data-tab="plan">📋 Plan</button>
-                <button class="wt-tab" data-tab="progress">📈 Progress</button>
-                <button class="wt-tab" data-tab="volume">🔥 Volume</button>
+                <button class="wt-tab active" data-tab="plan" data-i18n="tracker.tab.plan">📋 Plan</button>
+                <button class="wt-tab" data-tab="progress" data-i18n="tracker.tab.progress">📈 Progress</button>
+                <button class="wt-tab" data-tab="volume" data-i18n="tracker.tab.volume">🔥 Volume</button>
             </div>
 
             <!-- ═══════════════════ TAB 1: PLAN VIEW ═══════════════════ -->
             <div class="wt-tab-content active" id="wt-plan-tab">
                 <div class="wt-plan-header">
-                    <h2 class="wt-section-title">📋 My Workout Plan</h2>
-                    <button id="wt-regenerate-btn" class="secondary-btn wt-regen-btn" title="Ask AI to regenerate plan">🔄 Regenerate Plan</button>
+                    <h2 class="wt-section-title" data-i18n="tracker.plan.title">📋 My Workout Plan</h2>
+                    <button id="wt-regenerate-btn" class="secondary-btn wt-regen-btn" data-i18n="tracker.plan.regenerate" data-i18n-title="tracker.plan.regenerate_title" title="Ask AI to regenerate plan">🔄 Regenerate Plan</button>
                 </div>
 
                 <!-- Split Day Tabs -->
@@ -231,8 +238,8 @@
                 <!-- Exercise List -->
                 <div id="wt-exercise-list" class="wt-exercise-list">
                     <div class="wt-empty-state">
-                        <p>No workout plan yet.</p>
-                        <p style="color:#8b949e;font-size:0.85rem;">Ask the AI coach to generate a plan for you, or click Regenerate Plan.</p>
+                        <p data-i18n="tracker.plan.empty">No workout plan yet.</p>
+                        <p style="color:#8b949e;font-size:0.85rem;" data-i18n="tracker.plan.empty_hint">Ask the AI coach to generate a plan for you, or click Regenerate Plan.</p>
                     </div>
                 </div>
 
@@ -243,30 +250,30 @@
             <!-- ═══════════════════ TAB 2: PROGRESS VIEW ═══════════════════ -->
             <div class="wt-tab-content" id="wt-progress-tab">
                 <div class="wt-progress-header">
-                    <h2 class="wt-section-title">📈 Progressive Overload Tracker</h2>
+                    <h2 class="wt-section-title" data-i18n="tracker.progress.title">📈 Progressive Overload Tracker</h2>
                     <select id="wt-progress-weeks" class="form-select wt-small-select">
-                        <option value="4">4 weeks</option>
-                        <option value="8" selected>8 weeks</option>
-                        <option value="12">12 weeks</option>
-                        <option value="24">24 weeks</option>
+                        <option value="4" data-i18n="tracker.progress.weeks_4">4 weeks</option>
+                        <option value="8" selected data-i18n="tracker.progress.weeks_8">8 weeks</option>
+                        <option value="12" data-i18n="tracker.progress.weeks_12">12 weeks</option>
+                        <option value="24" data-i18n="tracker.progress.weeks_24">24 weeks</option>
                     </select>
                 </div>
 
                 <div class="wt-exercise-filter">
-                    <label>Exercise:</label>
+                    <label data-i18n="tracker.progress.label_exercise">Exercise:</label>
                     <select id="wt-exercise-select" class="form-select wt-exercise-dropdown">
-                        <option value="">All Exercises</option>
+                        <option value="" data-i18n="tracker.progress.all_exercises">All Exercises</option>
                     </select>
                 </div>
 
                 <!-- Single Exercise View -->
                 <div id="wt-single-exercise-view" style="display:none;">
                     <div class="wt-chart-card">
-                        <h3 class="wt-chart-title">Estimated 1RM Trend</h3>
+                        <h3 class="wt-chart-title" data-i18n="tracker.progress.e1rm_title">Estimated 1RM Trend</h3>
                         <canvas id="wt-e1rm-chart" height="200"></canvas>
                     </div>
                     <div class="wt-chart-card">
-                        <h3 class="wt-chart-title">Volume Load Trend</h3>
+                        <h3 class="wt-chart-title" data-i18n="tracker.progress.volume_title">Volume Load Trend</h3>
                         <canvas id="wt-volume-chart" height="200"></canvas>
                     </div>
                     <div id="wt-session-history" class="wt-session-history"></div>
@@ -277,8 +284,8 @@
                 <div id="wt-all-exercises-view">
                     <div id="wt-all-exercises-list" class="wt-all-exercises-list">
                         <div class="wt-empty-state">
-                            <p>No exercise data yet.</p>
-                            <p style="color:#8b949e;font-size:0.85rem;">Start logging sets via the AI coach to see your progress.</p>
+                            <p data-i18n="tracker.progress.empty">No exercise data yet.</p>
+                            <p style="color:#8b949e;font-size:0.85rem;" data-i18n="tracker.progress.empty_hint">Start logging sets via the AI coach to see your progress.</p>
                         </div>
                     </div>
                 </div>
@@ -287,25 +294,25 @@
             <!-- ═══════════════════ TAB 3: VOLUME HEATMAP ═══════════════════ -->
             <div class="wt-tab-content" id="wt-volume-tab">
                 <div class="wt-volume-header">
-                    <h2 class="wt-section-title">🔥 Weekly Muscle Volume</h2>
+                    <h2 class="wt-section-title" data-i18n="tracker.volume.title">🔥 Weekly Muscle Volume</h2>
                     <div class="wt-week-nav">
                         <button id="wt-week-prev" class="wt-week-btn">◀</button>
-                        <span id="wt-week-label">This Week</span>
+                        <span id="wt-week-label" data-i18n="tracker.volume.this_week">This Week</span>
                         <button id="wt-week-next" class="wt-week-btn">▶</button>
                     </div>
                 </div>
 
                 <div id="wt-muscle-bars" class="wt-muscle-bars">
                     <div class="wt-empty-state">
-                        <p>No volume data yet.</p>
-                        <p style="color:#8b949e;font-size:0.85rem;">Log exercise sets to see your weekly muscle volume.</p>
+                        <p data-i18n="tracker.volume.empty">No volume data yet.</p>
+                        <p style="color:#8b949e;font-size:0.85rem;" data-i18n="tracker.volume.empty_hint">Log exercise sets to see your weekly muscle volume.</p>
                     </div>
                 </div>
 
                 <div class="wt-volume-legend">
-                    <span class="wt-legend-item"><span class="wt-legend-swatch wt-legend-done"></span> Done</span>
-                    <span class="wt-legend-item"><span class="wt-legend-swatch wt-legend-remaining"></span> Remaining</span>
-                    <span class="wt-legend-info">Target based on experience level + goal</span>
+                    <span class="wt-legend-item"><span class="wt-legend-swatch wt-legend-done"></span> <span data-i18n="tracker.volume.legend_done">Done</span></span>
+                    <span class="wt-legend-item"><span class="wt-legend-swatch wt-legend-remaining"></span> <span data-i18n="tracker.volume.legend_remaining">Remaining</span></span>
+                    <span class="wt-legend-info" data-i18n="tracker.volume.legend_info">Target based on experience level + goal</span>
                 </div>
             </div>
         </div>
@@ -314,44 +321,44 @@
     <!-- Onboarding Wizard -->
     <div id="onboarding-overlay" class="auth-overlay hidden">
         <div class="auth-box wizard-box">
-            <h2 id="wizard-title">Let's get to know you</h2>
+            <h2 id="wizard-title" data-i18n="wizard.title.onboarding">Let's get to know you</h2>
             <p id="wizard-subtitle">Step 1 of 4</p>
 
             <form id="onboarding-form">
                 <!-- Step 1: Basics -->
                 <div class="wizard-step" data-step="1">
                     <div class="form-group">
-                        <label for="profile-name">What should we call you?</label>
-                        <input type="text" id="profile-name" placeholder="Your Name" required>
+                        <label for="profile-name" data-i18n="wizard.label.name">What should we call you?</label>
+                        <input type="text" id="profile-name" data-i18n-placeholder="wizard.placeholder.name" placeholder="Your Name" required>
                     </div>
                     <div class="form-group">
-                        <label for="profile-coach-name">Name your Coach</label>
-                        <input type="text" id="profile-coach-name" placeholder="NutriSync" maxlength="30">
-                        <small style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">Give your AI coach a name — or keep the default.</small>
+                        <label for="profile-coach-name" data-i18n="wizard.label.coach_name">Name your Coach</label>
+                        <input type="text" id="profile-coach-name" data-i18n-placeholder="wizard.placeholder.coach_name" placeholder="NutriSync" maxlength="30">
+                        <small style="color: rgba(255,255,255,0.5); font-size: 0.8rem;" data-i18n="wizard.hint.coach_name">Give your AI coach a name — or keep the default.</small>
                     </div>
                 </div>
 
                 <!-- Step 2: Body Stats -->
                 <div class="wizard-step hidden" data-step="2">
                     <div class="form-group">
-                        <label for="profile-gender">Gender</label>
+                        <label for="profile-gender" data-i18n="wizard.label.gender">Gender</label>
                         <select id="profile-gender" class="form-select">
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
+                            <option value="Male" data-i18n="wizard.option.gender.male">Male</option>
+                            <option value="Female" data-i18n="wizard.option.gender.female">Female</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="profile-dob">Date of Birth</label>
+                        <label for="profile-dob" data-i18n="wizard.label.dob">Date of Birth</label>
                         <input type="date" id="profile-dob" required>
                     </div>
                     <div class="form-group-row">
                         <div class="form-group">
-                            <label for="profile-height">Height (cm)</label>
-                            <input type="number" id="profile-height" placeholder="175" required>
+                            <label for="profile-height" data-i18n="wizard.label.height">Height (cm)</label>
+                            <input type="number" id="profile-height" data-i18n-placeholder="wizard.placeholder.height" placeholder="175" required>
                         </div>
                         <div class="form-group">
-                            <label for="profile-weight">Weight (kg)</label>
-                            <input type="number" id="profile-weight" placeholder="70" required>
+                            <label for="profile-weight" data-i18n="wizard.label.weight">Weight (kg)</label>
+                            <input type="number" id="profile-weight" data-i18n-placeholder="wizard.placeholder.weight" placeholder="70" required>
                         </div>
                     </div>
                 </div>
@@ -359,24 +366,24 @@
                 <!-- Step 3: Goals -->
                 <div class="wizard-step hidden" data-step="3">
                     <div class="form-group">
-                        <label for="profile-goal">Fitness Goal</label>
+                        <label for="profile-goal" data-i18n="wizard.label.goal">Fitness Goal</label>
                         <select id="profile-goal" class="form-select">
-                            <option value="Lose Weight">Lose Weight</option>
-                            <option value="Build Muscle">Build Muscle</option>
-                            <option value="Maintain">Maintain</option>
-                            <option value="Improve Endurance">Improve Endurance</option>
+                            <option value="Lose Weight" data-i18n="wizard.option.goal.lose_weight">Lose Weight</option>
+                            <option value="Build Muscle" data-i18n="wizard.option.goal.build_muscle">Build Muscle</option>
+                            <option value="Maintain" data-i18n="wizard.option.goal.maintain">Maintain</option>
+                            <option value="Improve Endurance" data-i18n="wizard.option.goal.improve_endurance">Improve Endurance</option>
                         </select>
                     </div>
                     <div class="form-group" id="target-weight-container">
-                        <label for="profile-target-weight">Target Weight (kg)</label>
-                        <input type="number" id="profile-target-weight" placeholder="70">
+                        <label for="profile-target-weight" data-i18n="wizard.label.target_weight">Target Weight (kg)</label>
+                        <input type="number" id="profile-target-weight" data-i18n-placeholder="wizard.placeholder.target_weight" placeholder="70">
                     </div>
                     <div class="form-group">
-                        <label for="profile-experience">Experience Level</label>
+                        <label for="profile-experience" data-i18n="wizard.label.experience">Experience Level</label>
                         <select id="profile-experience" class="form-select">
-                            <option value="Beginner">Beginner (0-1 years)</option>
-                            <option value="Intermediate">Intermediate (1-3 years)</option>
-                            <option value="Advanced">Advanced (3+ years)</option>
+                            <option value="Beginner" data-i18n="wizard.option.experience.beginner">Beginner (0-1 years)</option>
+                            <option value="Intermediate" data-i18n="wizard.option.experience.intermediate">Intermediate (1-3 years)</option>
+                            <option value="Advanced" data-i18n="wizard.option.experience.advanced">Advanced (3+ years)</option>
                         </select>
                     </div>
                 </div>
@@ -384,76 +391,76 @@
                 <!-- Step 4: Sport & Activity -->
                 <div class="wizard-step hidden" data-step="4">
                     <div class="form-group">
-                        <label for="profile-sport">Main Activity / Sport</label>
+                        <label for="profile-sport" data-i18n="wizard.label.sport">Main Activity / Sport</label>
                         <select id="profile-sport" class="form-select">
-                            <option value="Gym">Gym / Bodybuilding</option>
-                            <option value="Running">Running</option>
-                            <option value="Swimming">Swimming</option>
-                            <option value="Cycling">Cycling</option>
-                            <option value="Other">Other</option>
+                            <option value="Gym" data-i18n="wizard.option.sport.gym">Gym / Bodybuilding</option>
+                            <option value="Running" data-i18n="wizard.option.sport.running">Running</option>
+                            <option value="Swimming" data-i18n="wizard.option.sport.swimming">Swimming</option>
+                            <option value="Cycling" data-i18n="wizard.option.sport.cycling">Cycling</option>
+                            <option value="Other" data-i18n="wizard.option.sport.other">Other</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="profile-days">Workout Days / Week</label>
+                        <label for="profile-days" data-i18n="wizard.label.days">Workout Days / Week</label>
                         <input type="number" id="profile-days" min="1" max="14" value="3">
                     </div>
 
                     <!-- Gym-Specific: Split Editor -->
                     <div id="gym-options">
                         <div class="form-group">
-                            <label for="profile-split-template">Workout Split Template</label>
+                            <label for="profile-split-template" data-i18n="wizard.label.split_template">Workout Split Template</label>
                             <select id="profile-split-template" class="form-select">
-                                <option value="PPL">Push / Pull / Legs</option>
-                                <option value="Bro Split">Bro Split (Body Parts)</option>
-                                <option value="Upper Lower">Upper / Lower</option>
-                                <option value="Full Body">Full Body</option>
-                                <option value="Arnold Split">Arnold Split</option>
-                                <option value="PPL x2">PPL x2 (6-Day)</option>
-                                <option value="PPL + Rest (8-Day)">PPL + Rest (8-Day)</option>
-                                <option value="Custom">Custom</option>
+                                <option value="PPL" data-i18n="wizard.option.split.ppl">Push / Pull / Legs</option>
+                                <option value="Bro Split" data-i18n="wizard.option.split.bro">Bro Split (Body Parts)</option>
+                                <option value="Upper Lower" data-i18n="wizard.option.split.upper_lower">Upper / Lower</option>
+                                <option value="Full Body" data-i18n="wizard.option.split.full_body">Full Body</option>
+                                <option value="Arnold Split" data-i18n="wizard.option.split.arnold">Arnold Split</option>
+                                <option value="PPL x2" data-i18n="wizard.option.split.ppl_x2">PPL x2 (6-Day)</option>
+                                <option value="PPL + Rest (8-Day)" data-i18n="wizard.option.split.ppl_rest">PPL + Rest (8-Day)</option>
+                                <option value="Custom" data-i18n="wizard.option.split.custom">Custom</option>
                             </select>
                         </div>
 
                         <div class="form-group">
-                            <label>Customize Your Schedule:</label>
+                            <label data-i18n="wizard.label.schedule">Customize Your Schedule:</label>
                             <div id="split-editor-container"
                                 style="display: grid; grid-template-rows: repeat(4, auto); grid-auto-flow: column; gap: 10px; margin-top: 8px;">
                                 <!-- Dynamic Inputs will be injected here -->
                             </div>
                             <button type="button" id="add-split-day-btn" class="secondary-btn"
-                                style="width: 100%; margin-top: 8px; font-size: 0.85rem; padding: 8px;">+ Add
+                                style="width: 100%; margin-top: 8px; font-size: 0.85rem; padding: 8px;" data-i18n="wizard.btn.add_day">+ Add
                                 Day</button>
                         </div>
 
                         <div class="form-group">
-                            <label for="profile-equipment">Equipment Access</label>
+                            <label for="profile-equipment" data-i18n="wizard.label.equipment">Equipment Access</label>
                             <select id="profile-equipment" class="form-select">
-                                <option value="Gym">Full Gym</option>
-                                <option value="Home">Home (Dumbbells/Bands)</option>
-                                <option value="Bodyweight">Bodyweight Only</option>
+                                <option value="Gym" data-i18n="wizard.option.equip.gym">Full Gym</option>
+                                <option value="Home" data-i18n="wizard.option.equip.home">Home (Dumbbells/Bands)</option>
+                                <option value="Bodyweight" data-i18n="wizard.option.equip.bodyweight">Bodyweight Only</option>
                             </select>
                         </div>
 
                         <div class="form-group" id="equipment-chips-section">
-                            <label>Your Specific Equipment <span style="font-weight:400;color:rgba(255,255,255,0.5);font-size:0.85rem;">(select what you have)</span></label>
+                            <label><span data-i18n="wizard.label.specific_equipment">Your Specific Equipment</span> <span style="font-weight:400;color:rgba(255,255,255,0.5);font-size:0.85rem;" data-i18n="wizard.hint.specific_equipment">(select what you have)</span></label>
                             <div class="equip-select-all-row">
-                                <button type="button" id="equip-select-all-btn" class="secondary-btn" style="font-size:0.8rem;padding:6px 14px;width:auto;">✅ Select All</button>
-                                <button type="button" id="equip-deselect-all-btn" class="secondary-btn" style="font-size:0.8rem;padding:6px 14px;width:auto;">Clear All</button>
+                                <button type="button" id="equip-select-all-btn" class="secondary-btn" style="font-size:0.8rem;padding:6px 14px;width:auto;" data-i18n="wizard.btn.select_all">✅ Select All</button>
+                                <button type="button" id="equip-deselect-all-btn" class="secondary-btn" style="font-size:0.8rem;padding:6px 14px;width:auto;" data-i18n="wizard.btn.clear_all">Clear All</button>
                             </div>
                             <div id="equipment-chips-container" class="equipment-chips-container">
                                 <!-- Chips will be injected by JS -->
                             </div>
                             <div class="equip-custom-row" style="margin-top:10px;display:flex;gap:8px;">
-                                <input type="text" id="equip-custom-input" placeholder="Add custom equipment..." style="flex:1;">
-                                <button type="button" id="equip-custom-add-btn" class="secondary-btn" style="padding:8px 14px;width:auto;font-size:0.85rem;">+ Add</button>
+                                <input type="text" id="equip-custom-input" data-i18n-placeholder="wizard.placeholder.custom_equipment" placeholder="Add custom equipment..." style="flex:1;">
+                                <button type="button" id="equip-custom-add-btn" class="secondary-btn" style="padding:8px 14px;width:auto;font-size:0.85rem;" data-i18n="wizard.btn.add_custom">+ Add</button>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label>1RM (1 Rep Max) Records (Optional)</label>
+                            <label data-i18n="wizard.label.1rm">1RM (1 Rep Max) Records (Optional)</label>
                             <p
-                                style="color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-top: 0; margin-bottom: 8px;">
+                                style="color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-top: 0; margin-bottom: 8px;" data-i18n="wizard.hint.1rm">
                                 Know your strength? Log it here. If not, choose a weight you can perform for 8 reps with
                                 1–2 reps in reserve.
                             </p>
@@ -461,7 +468,7 @@
                                 <!-- RM inputs will be injected here -->
                             </div>
                             <button type="button" id="add-rm-btn" class="secondary-btn"
-                                style="width: 100%; margin-top: 8px; font-size: 0.85rem; padding: 8px;">+ Add 1RM
+                                style="width: 100%; margin-top: 8px; font-size: 0.85rem; padding: 8px;" data-i18n="wizard.btn.add_1rm">+ Add 1RM
                                 Record</button>
                         </div>
                     </div>
@@ -470,34 +477,34 @@
                 <!-- Step 5: Nutrition -->
                 <div class="wizard-step hidden" data-step="5">
                     <div class="form-group">
-                        <label for="profile-diet-type">Typical Diet Type</label>
+                        <label for="profile-diet-type" data-i18n="wizard.label.diet_type">Typical Diet Type</label>
                         <select id="profile-diet-type" class="form-select">
-                            <option value="Balanced">Balanced / Standard</option>
-                            <option value="Low Carb">Low Carb</option>
-                            <option value="Keto">Keto</option>
-                            <option value="High Protein">High Protein</option>
-                            <option value="Vegan">Vegan</option>
-                            <option value="Vegetarian">Vegetarian</option>
-                            <option value="Paleo">Paleo</option>
+                            <option value="Balanced" data-i18n="wizard.option.diet.balanced">Balanced / Standard</option>
+                            <option value="Low Carb" data-i18n="wizard.option.diet.low_carb">Low Carb</option>
+                            <option value="Keto" data-i18n="wizard.option.diet.keto">Keto</option>
+                            <option value="High Protein" data-i18n="wizard.option.diet.high_protein">High Protein</option>
+                            <option value="Vegan" data-i18n="wizard.option.diet.vegan">Vegan</option>
+                            <option value="Vegetarian" data-i18n="wizard.option.diet.vegetarian">Vegetarian</option>
+                            <option value="Paleo" data-i18n="wizard.option.diet.paleo">Paleo</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="profile-calories">Typical Daily Calories (Estimate)</label>
-                        <input type="number" id="profile-calories" placeholder="e.g. 2000" required>
-                        <small style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">We'll estimate this based on
+                        <label for="profile-calories" data-i18n="wizard.label.calories">Typical Daily Calories (Estimate)</label>
+                        <input type="number" id="profile-calories" data-i18n-placeholder="wizard.placeholder.calories" placeholder="e.g. 2000" required>
+                        <small style="color: rgba(255,255,255,0.5); font-size: 0.8rem;" data-i18n="wizard.hint.calories">We'll estimate this based on
                             your stats if unsure.</small>
                     </div>
                     <div class="form-group">
-                        <label for="profile-allergies">Allergies / Intolerances</label>
-                        <input type="text" id="profile-allergies" placeholder="e.g. Peanuts, Gluten, Dairy (Optional)">
+                        <label for="profile-allergies" data-i18n="wizard.label.allergies">Allergies / Intolerances</label>
+                        <input type="text" id="profile-allergies" data-i18n-placeholder="wizard.placeholder.allergies" placeholder="e.g. Peanuts, Gluten, Dairy (Optional)">
                     </div>
                 </div>
 
                 <div class="wizard-footer">
-                    <button type="button" id="wizard-cancel-btn" class="secondary-btn" style="margin-right:auto;color:rgba(255,255,255,0.5);">Cancel</button>
-                    <button type="button" id="wizard-back-btn" class="secondary-btn hidden">Back</button>
-                    <button type="button" id="wizard-next-btn">Next</button>
-                    <button type="submit" id="wizard-submit-btn" class="hidden">Finish</button>
+                    <button type="button" id="wizard-cancel-btn" class="secondary-btn" style="margin-inline-start:auto;color:rgba(255,255,255,0.5);" data-i18n="wizard.btn.cancel">Cancel</button>
+                    <button type="button" id="wizard-back-btn" class="secondary-btn hidden" data-i18n="wizard.btn.back">Back</button>
+                    <button type="button" id="wizard-next-btn" data-i18n="wizard.btn.next">Next</button>
+                    <button type="submit" id="wizard-submit-btn" class="hidden" data-i18n="wizard.btn.finish">Finish</button>
                 </div>
             </form>
         </div>

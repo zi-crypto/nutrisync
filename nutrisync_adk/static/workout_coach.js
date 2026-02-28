@@ -87,7 +87,7 @@ class SquatProfile {
     reset() {
         this.state = 'UP';
         this.reps = 0;
-        this.feedback = "Ready";
+        this.feedback = t('coach.feedback.ready');
         this.lastAngle = 180;
         this.smoothedAngle = undefined;
     }
@@ -124,9 +124,9 @@ class SquatProfile {
             return {
                 state: this.state, // Preserve state so it doesn't reset
                 reps: this.reps,
-                feedback: "Stand up to squat!",
+                feedback: t('coach.feedback.stand_up_to_squat'),
                 angle: Math.round(angleKnee),
-                instruction: "Camera placement: Waist height, direct side view."
+                instruction: t('coach.instruction.squat')
             };
         }
 
@@ -137,9 +137,9 @@ class SquatProfile {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count only on completion
             } else if (this.state === 'DESCENDING') {
-                this.feedback = "Squat deeper next time.";
+                this.feedback = t('coach.feedback.squat_deeper');
             } else if (this.state === 'UP' && isNaN(Number(this.feedback))) {
-                this.feedback = "Ready";
+                this.feedback = t('coach.feedback.ready');
             }
             this.state = 'UP';
         }
@@ -147,7 +147,7 @@ class SquatProfile {
         else if (angleKnee <= 160 && hip.y < knee.y) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
-                this.feedback = "Ready"; // Clear previous rep count
+                this.feedback = t('coach.feedback.ready'); // Clear previous rep count
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING';
             }
@@ -157,7 +157,7 @@ class SquatProfile {
         else if (hip.y >= knee.y) {
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN';
-                this.feedback = "Good depth, push up!";
+                this.feedback = t('coach.feedback.good_depth_push_up');
             }
         }
 
@@ -168,7 +168,7 @@ class SquatProfile {
             reps: this.reps,
             feedback: this.feedback,
             angle: Math.round(angleKnee),
-            instruction: "Camera placement: Waist height, direct side view."
+            instruction: t('coach.instruction.squat')
         };
     }
 }
@@ -181,7 +181,7 @@ class PushupProfile {
     reset() {
         this.state = 'SETUP';
         this.reps = 0;
-        this.feedback = "Ready";
+        this.feedback = t('coach.feedback.ready');
         this.lastAngle = 180;
         this.smoothedAngle = undefined;
 
@@ -222,19 +222,19 @@ class PushupProfile {
             if (angleElbow > 150) {
                 if (this.setupStartTime === 0) {
                     this.setupStartTime = Date.now();
-                    this.feedback = "Hold plank to calibrate...";
+                    this.feedback = t('coach.feedback.hold_plank');
                 } else if (Date.now() - this.setupStartTime > 3000) {
                     this.maxRange = this.distances.reduce((a, b) => a + b, 0) / this.distances.length;
                     this.state = 'UP';
-                    this.feedback = "Calibrated! Ready.";
+                    this.feedback = t('coach.feedback.calibrated');
                 } else {
                     this.distances.push(currentDistance);
-                    this.feedback = "Hold plank to calibrate...";
+                    this.feedback = t('coach.feedback.hold_plank');
                 }
             } else {
                 this.setupStartTime = 0;
                 this.distances = [];
-                this.feedback = "Straighten arms to calibrate";
+                this.feedback = t('coach.feedback.straighten_arms');
             }
 
             return {
@@ -242,8 +242,8 @@ class PushupProfile {
                 reps: this.reps,
                 feedback: this.feedback,
                 angle: Math.round(angleElbow),
-                label: 'Setup',
-                instruction: "Keep arms perfectly straight in plank for 3 seconds."
+                label: t('coach.label.setup'),
+                instruction: t('coach.instruction.pushup_setup')
             };
         }
 
@@ -259,17 +259,17 @@ class PushupProfile {
             return {
                 state: this.state, // Preserve state
                 reps: this.reps,
-                feedback: "Get into a plank!",
+                feedback: t('coach.feedback.get_into_plank'),
                 angle: Math.round(angleElbow),
-                label: 'Elbow Angle',
-                instruction: "Camera placement: Floor level, 45-degree angle side view."
+                label: t('coach.label.elbow_angle'),
+                instruction: t('coach.instruction.pushup')
             };
         }
 
         // Strict Form check: Back should be relatively straight (approx 180). 
         // If it dips significantly below 130 (more forgiving for camera angles), trigger a form warning.
         if (angleBack < 130 && this.state !== 'DOWN') {
-            this.feedback = "Keep back straight!";
+            this.feedback = t('coach.feedback.keep_back_straight');
             // We can optionally return early or just let the feedback sit. Let's let it sit.
         }
 
@@ -279,16 +279,16 @@ class PushupProfile {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count only on completion
             } else if (this.state === 'DESCENDING') {
-                this.feedback = "Go lower!";
-            } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== "Calibrated! Ready.") {
-                this.feedback = "Ready";
+                this.feedback = t('coach.feedback.go_lower');
+            } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== t('coach.feedback.calibrated')) {
+                this.feedback = t('coach.feedback.ready');
             }
             this.state = 'UP';
         }
         else if (angleElbow <= 160 && currentDistance > this.maxRange * 0.45) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING';
-                this.feedback = "Ready"; // Clear previous rep count
+                this.feedback = t('coach.feedback.ready'); // Clear previous rep count
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING';
             }
@@ -297,7 +297,7 @@ class PushupProfile {
             // DOWN state dynamically determined by actual pixel distance shrinking
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN';
-                this.feedback = "Good depth, push up!";
+                this.feedback = t('coach.feedback.good_depth_push_up');
             }
         }
 
@@ -308,8 +308,8 @@ class PushupProfile {
             reps: this.reps,
             feedback: this.feedback,
             angle: Math.round(angleElbow),
-            label: 'Elbow Angle',
-            instruction: "Camera placement: Floor level, 45-degree angle side view."
+            label: t('coach.label.elbow_angle'),
+            instruction: t('coach.instruction.pushup')
         };
     }
 }
@@ -322,7 +322,7 @@ class PullProfile {
     reset() {
         this.state = 'SETUP'; // Requires calibration first
         this.reps = 0;
-        this.feedback = "Ready";
+        this.feedback = t('coach.feedback.ready');
         this.lastAngle = 180;
         this.smoothedAngle = undefined;
 
@@ -357,27 +357,27 @@ class PullProfile {
             if (angleElbow > 150 && wrist.y < shoulder.y) {
                 if (this.setupStartTime === 0) {
                     this.setupStartTime = Date.now();
-                    this.feedback = "Hang straight to calibrate...";
+                    this.feedback = t('coach.feedback.hang_straight');
                 } else if (Date.now() - this.setupStartTime > 3000) {
                     this.maxRange = this.distances.reduce((a, b) => a + b, 0) / this.distances.length;
                     this.state = 'UP';
-                    this.feedback = "Calibrated! Ready.";
+                    this.feedback = t('coach.feedback.calibrated');
                 } else {
                     this.distances.push(currentDistance);
-                    this.feedback = "Hang straight to calibrate...";
+                    this.feedback = t('coach.feedback.hang_straight');
                 }
             } else {
                 this.setupStartTime = 0;
                 this.distances = [];
-                this.feedback = "Fully extend arms over head to calibrate";
+                this.feedback = t('coach.feedback.extend_arms');
             }
             return {
                 state: this.state,
                 reps: this.reps,
                 feedback: this.feedback,
                 angle: Math.round(angleElbow),
-                label: 'Setup',
-                instruction: "Keep arms perfectly straight over head for 3 seconds."
+                label: t('coach.label.setup'),
+                instruction: t('coach.instruction.pullup_setup')
             };
         }
 
@@ -389,10 +389,10 @@ class PullProfile {
             return {
                 state: this.state,
                 reps: this.reps,
-                feedback: "Reach hands UP for pullups!",
+                feedback: t('coach.feedback.reach_hands_up'),
                 angle: Math.round(angleElbow),
-                label: 'Elbow Angle',
-                instruction: "Camera placement: Camera higher up, capturing full arm extension."
+                label: t('coach.label.elbow_angle'),
+                instruction: t('coach.instruction.pullup')
             };
         }
 
@@ -402,16 +402,16 @@ class PullProfile {
                 this.reps++;
                 this.feedback = `${this.reps}`; // Emits Rep count only on completion
             } else if (this.state === 'DESCENDING') {
-                this.feedback = "Pull higher!";
-            } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== "Calibrated! Ready.") {
-                this.feedback = "Ready";
+                this.feedback = t('coach.feedback.pull_higher');
+            } else if (this.state === 'UP' && isNaN(Number(this.feedback)) && this.feedback !== t('coach.feedback.calibrated')) {
+                this.feedback = t('coach.feedback.ready');
             }
             this.state = 'UP'; // Arms extended
         }
         else if (angleElbow <= 150 && currentDistance > this.maxRange * 0.25) {
             if (this.state === 'UP') {
                 this.state = 'DESCENDING'; // Starting the pull
-                this.feedback = "Ready"; // Clear previous rep count
+                this.feedback = t('coach.feedback.ready'); // Clear previous rep count
             } else if (this.state === 'DOWN') {
                 this.state = 'ASCENDING'; // Releasing the pull
             }
@@ -419,7 +419,7 @@ class PullProfile {
         else if (currentDistance <= this.maxRange * 0.25) {
             if (this.state === 'DESCENDING') {
                 this.state = 'DOWN'; // Contracted position
-                this.feedback = "Good pull";
+                this.feedback = t('coach.feedback.good_pull');
             }
         }
 
@@ -430,8 +430,8 @@ class PullProfile {
             reps: this.reps,
             feedback: this.feedback,
             angle: Math.round(angleElbow),
-            label: 'Elbow Angle',
-            instruction: "Camera placement: Camera higher up, capturing full arm extension."
+            label: t('coach.label.elbow_angle'),
+            instruction: t('coach.instruction.pullup')
         };
     }
 }
@@ -474,7 +474,7 @@ class ExerciseEngine {
             return {
                 state: this.currentProfile.state,
                 reps: this.currentProfile.reps,
-                feedback: "Ensure upper body is clearly visible.",
+                feedback: t('coach.feedback.ensure_visible'),
                 angle: 0,
                 instruction: this.currentProfile.instruction || ""
             };
@@ -530,7 +530,7 @@ class CameraManager {
             console.log("CameraManager started with explicit stream.");
         } catch (err) {
             console.error("Error accessing camera: ", err);
-            alert("Unable to access camera: " + err.message);
+            alert(t('coach.camera_error', {error: err.message}));
         }
     }
 
@@ -605,9 +605,19 @@ class UIRenderer {
     }
 
     drawOverlayText(text, x, y, size = '20px', color = 'white') {
-        this.ctx.font = `${size} Arial`;
+        const isRtl = window.getDir && window.getDir() === 'rtl';
+        const fontFamily = isRtl ? 'Cairo, Arial' : 'Arial';
+        this.ctx.font = `${size} ${fontFamily}`;
         this.ctx.fillStyle = color;
-        this.ctx.fillText(text, x, y);
+        if (isRtl) {
+            this.ctx.direction = 'rtl';
+            this.ctx.textAlign = 'right';
+            this.ctx.fillText(text, this.canvasElement.width - x, y);
+            this.ctx.direction = 'ltr';
+            this.ctx.textAlign = 'start';
+        } else {
+            this.ctx.fillText(text, x, y);
+        }
     }
 
     render(results) {
@@ -668,9 +678,9 @@ class LiveCoachController {
 
             if (engineStatus) {
                 // Render HUD
-                this.uiRenderer.drawOverlayText(`Reps: ${engineStatus.reps}`, 20, 40, '30px', '#00FF00');
-                this.uiRenderer.drawOverlayText(`Stage: ${engineStatus.state}`, 20, 80, '24px', '#FFF');
-                this.uiRenderer.drawOverlayText(`Feedback: ${engineStatus.feedback}`, 20, 120, '20px', '#FFF');
+                this.uiRenderer.drawOverlayText(t('coach.hud.reps', {count: engineStatus.reps}), 20, 40, '30px', '#00FF00');
+                this.uiRenderer.drawOverlayText(t('coach.hud.stage', {stage: engineStatus.state}), 20, 80, '24px', '#FFF');
+                this.uiRenderer.drawOverlayText(t('coach.hud.feedback', {text: engineStatus.feedback}), 20, 120, '20px', '#FFF');
 
                 if (engineStatus.instruction) {
                     // Render camera instruction centered at the bottom
@@ -685,11 +695,11 @@ class LiveCoachController {
                     this.uiRenderer.drawOverlayText(engineStatus.instruction, textX, instructionY, '16px', '#FFD700');
                 }
 
-                const angleLabel = engineStatus.label || 'Knee Angle';
-                this.uiRenderer.drawOverlayText(`${angleLabel}: ${engineStatus.angle}`, 20, 420, '18px', '#FFF');
+                const angleLabel = engineStatus.label || t('coach.hud.knee_angle');
+                this.uiRenderer.drawOverlayText(t('coach.hud.angle', {label: angleLabel, angle: engineStatus.angle}), 20, 420, '18px', '#FFF');
 
                 // Trigger voice coaching
-                if (engineStatus.feedback !== "Ready" && engineStatus.feedback !== this.lastFeedback) {
+                if (engineStatus.feedback !== t('coach.feedback.ready') && engineStatus.feedback !== this.lastFeedback) {
 
                     // Check if the feedback is purely a number (a rep count)
                     const isRepCount = !isNaN(Number(engineStatus.feedback));
@@ -699,7 +709,7 @@ class LiveCoachController {
                 }
             }
         } else {
-            this.uiRenderer.drawOverlayText("No Pose Detected", 20, 40, '24px', '#FF0000');
+            this.uiRenderer.drawOverlayText(t('coach.hud.no_pose'), 20, 40, '24px', '#FF0000');
         }
     }
 }
