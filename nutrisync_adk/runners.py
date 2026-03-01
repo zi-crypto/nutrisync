@@ -154,11 +154,17 @@ class NutriSyncRunner:
     async def _get_or_create_session(self, user_id: str, state: dict = None):
         """Get existing session for user, or create a new one."""
         session_id = f"session_{user_id}"
-        session = await self.session_service.get_session(
-            app_name=APP_NAME,
-            user_id=user_id,
-            session_id=session_id,
-        )
+        try:
+            session = await self.session_service.get_session(
+                app_name=APP_NAME,
+                user_id=user_id,
+                session_id=session_id,
+            )
+        except Exception as e:
+            logger.warning(f"Corrupt session detected for {user_id}, resetting: {e}")
+            await self._delete_session(user_id)
+            session = None
+
         if session is None:
             session = await self.session_service.create_session(
                 app_name=APP_NAME,
@@ -168,8 +174,34 @@ class NutriSyncRunner:
             )
         return session
 
+    async def _delete_session(self, user_id: str):
+        """Delete a user's ADK session (used for recovery from corrupt state)."""
+        session_id = f"session_{user_id}"
+        try:
+            await self.session_service.delete_session(
+                app_name=APP_NAME,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            logger.info(f"Deleted session {session_id} for recovery.")
+        except Exception as e:
+            logger.error(f"Failed to delete session {session_id}: {e}")
+
+    async def reset_session(self, user_id: str):
+        """Public method to reset a user's ADK session (admin recovery)."""
+        async with self._get_user_lock(user_id):
+            await self._delete_session(user_id)
+            logger.info(f"Admin-triggered session reset for {user_id}")
+
     async def process_message(self, user_id: str, text: str, image_bytes: bytes = None, mime_type: str = None, language: str = "en") -> dict:
-        """Process a user message and return the response."""
+        """Process a user message and return the response.
+        
+        Implements automatic session recovery: if the first attempt fails
+        (e.g. corrupt ADK session from interrupted request), deletes the
+        session and retries once under the same per-user lock to prevent
+        race conditions.  (See ADK issue #3328 — DatabaseSessionService
+        can leave stale DB transactions on error.)
+        """
         try:
             # 0. Set Context Variable for Tools
             token = current_user_id.set(user_id)
@@ -181,7 +213,34 @@ class NutriSyncRunner:
                 current_user_id.reset(token)
 
         except Exception as e:
-            logger.error(f"Error processing message: {e}", exc_info=True)
+            logger.error(f"Error processing message for user {user_id}: {e}", exc_info=True)
+
+            # ── Session Recovery: delete + retry under ONE lock ──
+            # Using a single lock acquisition prevents another request from
+            # slipping in between the delete and retry (asyncio.Lock is not
+            # reentrant, so these MUST be sequential, never nested).
+            try:
+                logger.info(f"Attempting session recovery for {user_id}...")
+                posthog_capture(user_id, "session_recovery_attempted", {
+                    "original_error": str(e)[:200],
+                })
+                token = current_user_id.set(user_id)
+                try:
+                    async with self._get_user_lock(user_id):
+                        await self._delete_session(user_id)
+                        result = await self._process_message_impl(user_id, text, image_bytes, mime_type, language)
+                    logger.info(f"Session recovery succeeded for {user_id}")
+                    posthog_capture(user_id, "session_recovery_succeeded", {})
+                    return result
+                finally:
+                    current_user_id.reset(token)
+            except Exception as retry_err:
+                logger.error(f"Session recovery also failed for {user_id}: {retry_err}", exc_info=True)
+                posthog_capture(user_id, "session_recovery_failed", {
+                    "original_error": str(e)[:200],
+                    "retry_error": str(retry_err)[:200],
+                })
+
             return {
                 "text": "Error: Something went wrong in the cognitive engine.",
                 "chart": None,

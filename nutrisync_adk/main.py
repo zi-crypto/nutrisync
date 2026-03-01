@@ -95,6 +95,20 @@ async def get_history(guest_id: str, after: Optional[str] = None):
     history = await runner.history_service.get_recent_chat_history(guest_id, limit=50, after=after)
     return history
 
+@app.post("/api/admin/reset-session/{user_id}")
+async def reset_user_session(user_id: str, request: Request):
+    """Admin endpoint to reset a user's ADK session (recovery from corrupt state).
+    
+    Requires X-Admin-Key header matching ADMIN_KEY env var.
+    """
+    admin_key = os.getenv("ADMIN_KEY", "")
+    if not admin_key or request.headers.get("X-Admin-Key") != admin_key:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    await runner.reset_session(user_id)
+    logger.info(f"Admin reset session for user {user_id}")
+    return {"status": "session_reset", "user_id": user_id}
+
 @app.post("/api/chat/feedback")
 async def submit_feedback(request: FeedbackRequest):
     try:
