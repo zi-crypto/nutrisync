@@ -1,3 +1,13 @@
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html {
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+}
+
 :root {
     --bg-color: #0d1117;
     --chat-bg: rgba(22, 27, 34, 0.7);
@@ -22,6 +32,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: flex-start;
+    width: 100%;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
@@ -62,6 +73,8 @@ header {
     align-items: center;
     border-bottom: var(--glass-border);
     z-index: 10;
+    overflow: hidden;
+    min-width: 0;
 }
 
 .logo {
@@ -288,6 +301,72 @@ button:hover {
 #upload-btn:hover {
     color: #c9d1d9;
     background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Attachment Popover ──────────────────────────────────────────────────── */
+.attach-wrapper {
+    position: relative;
+}
+
+.attach-popover {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    inset-inline-start: 0;
+    background: rgba(22, 27, 34, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 160px;
+    animation: attachPopIn 0.18s ease-out;
+}
+
+@keyframes attachPopIn {
+    from { opacity: 0; transform: translateY(6px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.attach-popover.hidden {
+    display: none;
+}
+
+.attach-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #c9d1d9;
+    font-family: var(--font-family);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    height: auto;
+}
+
+.attach-option:hover {
+    background: rgba(88, 166, 255, 0.12);
+    color: #fff;
+}
+
+.attach-option svg {
+    flex-shrink: 0;
+    color: #8b949e;
+    transition: color 0.15s ease;
+}
+
+.attach-option:hover svg {
+    color: var(--accent-color);
 }
 
 /* Charts */
@@ -955,6 +1034,44 @@ button:hover {
 
     .feedback-trigger {
         opacity: 0.7;
+    }
+}
+
+/* ── Mobile layout fix ───────────────────────────────────────────────────── */
+@media (max-width: 919px) {
+    .chat-container {
+        max-width: 100%;
+        border-inline-start: none;
+        border-inline-end: none;
+    }
+
+    header {
+        padding: 14px 12px;
+        gap: 6px;
+    }
+
+    .status {
+        margin-inline-start: 8px;
+        margin-inline-end: 8px;
+        font-size: 0.8rem;
+    }
+
+    .header-right {
+        gap: 8px !important;
+        min-width: 0;
+        flex-shrink: 1;
+    }
+
+    .header-right .icon-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    #header-username {
+        max-width: 60px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 }
 

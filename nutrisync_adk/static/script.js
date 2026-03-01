@@ -9,7 +9,7 @@ if (typeof marked !== 'undefined') {
         const html = linkRenderer.call(renderer, href, title, text);
         return html.replace(/^<a /, '<a target="_blank" rel="noopener noreferrer" ');
     };
-    marked.setOptions({ renderer: renderer });
+    marked.setOptions({ renderer: renderer, breaks: true });
 }
 
 class ChatCache {
@@ -116,6 +116,10 @@ class ChatApp {
         this.sendBtn = document.getElementById('send-btn');
         this.uploadBtn = document.getElementById('upload-btn');
         this.fileInput = document.getElementById('file-input');
+        this.cameraInput = document.getElementById('camera-input');
+        this.attachPopover = document.getElementById('attach-popover');
+        this.attachCameraBtn = document.getElementById('attach-camera-btn');
+        this.attachGalleryBtn = document.getElementById('attach-gallery-btn');
         this.previewContainer = document.getElementById('image-preview-container');
         this.imagePreview = document.getElementById('image-preview');
         this.clearImageBtn = document.getElementById('clear-image');
@@ -128,16 +132,31 @@ class ChatApp {
         // Event Listeners
         this.sendBtn.addEventListener('click', () => this.sendMessage());
         this.userInput.addEventListener('keydown', (e) => this.handleEnterKey(e));
-        this.uploadBtn.addEventListener('click', () => this.fileInput.click());
+        this.uploadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.attachPopover.classList.toggle('hidden');
+        });
+        this.attachCameraBtn.addEventListener('click', () => {
+            this.attachPopover.classList.add('hidden');
+            this.cameraInput.click();
+        });
+        this.attachGalleryBtn.addEventListener('click', () => {
+            this.attachPopover.classList.add('hidden');
+            this.fileInput.click();
+        });
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        this.cameraInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.clearImageBtn.addEventListener('click', () => this.clearImage());
         this.userInput.addEventListener('input', (e) => this.autoResizeInput(e.target));
 
-        // Close feedback popup on outside click
+        // Close feedback popup & attach popover on outside click
         document.addEventListener('click', (e) => {
             if (this.activeFeedbackPopup && !e.target.closest('.feedback-popup') && !e.target.closest('.feedback-trigger')) {
                 this.activeFeedbackPopup.remove();
                 this.activeFeedbackPopup = null;
+            }
+            if (!e.target.closest('.attach-wrapper')) {
+                this.attachPopover.classList.add('hidden');
             }
         });
     }
@@ -340,6 +359,7 @@ class ChatApp {
 
     clearImage() {
         this.fileInput.value = '';
+        this.cameraInput.value = '';
         this.currentImageBase64 = null;
         this.previewContainer.style.display = 'none';
     }
@@ -2795,12 +2815,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                         enableBtn.disabled = true;
 
                         // Get VAPID public key
+                        let vapidKey = "";
                         const meta = document.querySelector('meta[name="vapid-key"]');
-                        if (!meta || !meta.content) throw new Error('System Error: VAPID key not found in HTML.');
+                        if (meta && meta.content) {
+                            vapidKey = meta.content;
+                        } else {
+                            try {
+                                const vRes = await fetch('/api/notifications/vapid-key');
+                                if (vRes.ok) {
+                                    const vData = await vRes.json();
+                                    vapidKey = vData.key;
+                                }
+                            } catch (e) {
+                                console.error('Failed to fetch VAPID key from API', e);
+                            }
+                        }
+
+                        if (!vapidKey) throw new Error('System Error: VAPID key not found in HTML or API.');
 
                         let applicationServerKey;
                         try {
-                            applicationServerKey = urlBase64ToUint8Array(meta.content);
+                            applicationServerKey = urlBase64ToUint8Array(vapidKey);
                         } catch (err) {
                             throw new Error('System Error: Invalid VAPID key format.');
                         }

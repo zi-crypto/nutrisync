@@ -757,6 +757,10 @@ async def serve_index():
 
 # ── Notifications API ──────────────────────────────────────────────────────
 
+@app.get("/api/notifications/vapid-key")
+async def get_vapid_key():
+    return {"key": os.getenv("VAPID_PUBLIC_KEY", "")}
+
 class PushSubscriptionRequest(BaseModel):
     user_id: str
     endpoint: str
