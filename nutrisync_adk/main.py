@@ -272,6 +272,19 @@ async def get_profile(user_id: str):
         logger.error(f"Error fetching profile: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.patch("/api/profile/{user_id}/language")
+async def update_language(user_id: str, body: dict):
+    """Lightweight endpoint to persist language preference without a full profile save."""
+    lang = body.get("language", "en")
+    if lang not in ("en", "ar"):
+        lang = "en"
+    try:
+        runner.supabase.table("user_profile").update({"language": lang}).eq("user_id", user_id).execute()
+        return {"status": "ok", "language": lang}
+    except Exception as e:
+        logger.error(f"Error updating language: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/profile")
 async def update_profile(request: ProfileRequest):
     try:

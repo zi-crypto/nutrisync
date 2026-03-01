@@ -719,6 +719,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         langSwitcher.value = window.getLang ? window.getLang() : 'en';
         langSwitcher.addEventListener('change', () => {
             if (window.setLang) window.setLang(langSwitcher.value);
+            // Persist language to DB if user is logged in
+            const uid = window.app && window.app.userId;
+            if (uid) {
+                fetch(`/api/profile/${uid}/language`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ language: langSwitcher.value })
+                }).catch(err => console.warn('Language persist failed:', err));
+            }
         });
     }
 
@@ -1826,6 +1835,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderSplitEditor(splitTemplates['PPL']);
             } else {
                 console.log("Profile found:", profile.name);
+                // DB is the source of truth for authenticated users' language preference.
+                // Sync DB → localStorage on every login (enables cross-device consistency).
+                if (profile.language && window.setLang) {
+                    const currentLang = window.getLang ? window.getLang() : 'en';
+                    if (profile.language !== currentLang) {
+                        window.setLang(profile.language);
+                    }
+                    const ls = document.getElementById('lang-switcher');
+                    if (ls) ls.value = profile.language;
+                }
                 // Update Header
                 const headerUsername = document.getElementById('header-username');
                 const profileSection = document.getElementById('profile-section');

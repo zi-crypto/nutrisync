@@ -81,8 +81,59 @@ stateDiagram-v2
   Stopped --> [*]
 ```
 
-## 3. AI Agent Request State Machine
-Describes the backend state machine running within Google's Agent Development Kit (ADK) Runner (`runners.py`) for processing a single user message. Includes 6 parallel context fetchers, 7 state_delta keys, and async locks.
+## 3. Live Coach API Exercise Logging Flow
+Describes the server-side flow when the frontend Live Coach UI submits a completed set via `POST /api/live-coach/log` (defined in `main.py`). This is independent of the AI agent — it writes directly to `exercise_logs` with auto set numbering, body-weight resolution, and PR detection.
+
+```mermaid
+stateDiagram-v2
+  [*] --> ButtonClick : User clicks "Log Set" in Live Coach HUD
+
+  ButtonClick --> PostRequest : POST /api/live-coach/log {user_id, exercise_key, reps, weight_kg?}
+
+  PostRequest --> ResolveExerciseName : Map exercise_key via LIVE_COACH_EXERCISE_MAP (squat→Bodyweight Squats, pushup→Push-ups, pullup→Pull-ups)
+  
+  ResolveExerciseName --> ValidateReps
+  ValidateReps --> Error400 : reps ≤ 0 (error.reps_zero)
+  ValidateReps --> ResolveWeight : reps > 0
+
+  state ResolveWeight {
+    [*] --> CheckProvided : weight_kg in request?
+    CheckProvided --> UseProvided : Yes
+    CheckProvided --> FetchProfile : No → query user_profile.weight_kg
+    FetchProfile --> UseBodyWeight : Profile found
+    FetchProfile --> UseZero : No profile data
+    UseProvided --> [*]
+    UseBodyWeight --> [*]
+    UseZero --> [*]
+  }
+
+  ResolveWeight --> DetermineSetNumber : Query exercise_logs today for this exercise, ORDER BY set_number DESC LIMIT 1
+  DetermineSetNumber --> SetNumberResolved : set_number = existing_max + 1 (or 1 if none)
+
+  state PRDetection {
+    [*] --> FetchBestVolume : Best historical volume_load (non-warmup)
+    [*] --> FetchBestWeight : Best historical weight_kg (non-warmup)
+    FetchBestVolume --> Compare
+    FetchBestWeight --> Compare
+    Compare --> VolumePR : current_volume > existing_best_volume
+    Compare --> WeightPR : current_weight > existing_best_weight (but not volume PR)
+    Compare --> NoPR : Neither exceeded
+    VolumePR --> [*]
+    WeightPR --> [*]
+    NoPR --> [*]
+  }
+
+  SetNumberResolved --> PRDetection
+
+  PRDetection --> InsertExerciseLog : Insert row (is_warmup=false, notes="Logged via Live Coach", is_pr flag)
+  InsertExerciseLog --> PostHogCapture : posthog_capture(api_live_coach_logged, {exercise, reps, weight, set, is_pr, pr_type, volume_load})
+  PostHogCapture --> ReturnResult : {success, exercise_name, set_number, reps, weight_kg, volume_load, is_pr, pr_type}
+  ReturnResult --> [*]
+  Error400 --> [*]
+```
+
+## 4. AI Agent Request State Machine
+Describes the backend state machine running within Google's Agent Development Kit (ADK) Runner (`runners.py`) for processing a single user message. Includes 7 parallel context fetchers, 10 state_delta keys, language-aware prompt loading, and async locks.
 
 ```mermaid
 stateDiagram-v2
@@ -98,24 +149,38 @@ stateDiagram-v2
      [*] --> FetchUserEquipment
      [*] --> Fetch1RMRecords
      [*] --> FetchWorkoutPlan
+     [*] --> FetchSplitStructure
      FetchProfile --> MergeContext
      FetchDailyGoals --> MergeContext
      FetchPersistentContext --> MergeContext
      FetchUserEquipment --> MergeContext
      Fetch1RMRecords --> MergeContext
      FetchWorkoutPlan --> MergeContext
+     FetchSplitStructure --> MergeContext
   }
   
-  MergeContext --> SessionUpdate : Apply state_delta (7 keys) via run_async()
+  MergeContext --> SessionUpdate : Apply state_delta (10 keys) via run_async()
   
   note right of SessionUpdate
-    Keys: user_profile, daily_totals,
+    Keys: language, coach_name,
+    user_profile, daily_totals,
     current_time, active_notes,
     equipment_list, one_rm_records,
-    workout_plan
+    split_structure, workout_plan
   end note
   
-  SessionUpdate --> UserMessageLogged : Dual-write User Message to chat_history
+  SessionUpdate --> SelectPromptTemplate : _build_instruction reads state.language
+  SelectPromptTemplate --> SubstitutePlaceholders : Load system.md (en) or system_ar.md (ar)
+  
+  note right of SubstitutePlaceholders
+    9 placeholders: {user_profile},
+    {daily_totals}, {current_time},
+    {active_notes}, {equipment_list},
+    {one_rm_records}, {split_structure},
+    {workout_plan}, {coach_name}
+  end note
+  
+  SubstitutePlaceholders --> UserMessageLogged : Dual-write User Message to chat_history
   
   UserMessageLogged --> AgentExecution : Dispatch streaming async event generator
   
@@ -133,7 +198,7 @@ stateDiagram-v2
   ReturnToFrontend --> [*] : HTTP 200 OK
 ```
 
-## 4. Message Feedback Flow
+## 5. Message Feedback Flow
 Describes the state of recording user sentiment and feedback on AI messages.
 
 ```mermaid
@@ -152,7 +217,7 @@ stateDiagram-v2
   SuccessState --> [*] : Feedback logged, Modal closes, Trigger color updates
 ```
 
-## 5. Client-Side Chat History Caching Flow
+## 6. Client-Side Chat History Caching Flow
 Describes how the frontend utilizes IndexedDB (`ChatCache`) to minimize backend fetch latency and DB load on page reloads.
 
 ```mermaid
@@ -173,8 +238,8 @@ stateDiagram-v2
   RenderAndStore --> [*]
 ```
 
-## 6. Workout Split Progression Logic
-Describes the state flow internally managed when requesting the next workout (`get_next_workout` remotely via RPC).
+## 7. Workout Split Progression Logic
+Describes the state flow when the agent queries the next workout via the `get_next_scheduled_workout` tool (which internally calls the `get_next_workout` PostgreSQL RPC).
 
 ```mermaid
 stateDiagram-v2
@@ -199,7 +264,7 @@ stateDiagram-v2
   NoActiveSplit --> [*] : Returns `{next_workout: null, message}`
 ```
 
-## 7. Health Score Snapshot Generation Flow
+## 8. Health Score Snapshot Generation Flow
 Describes the on-demand generation of user improvement scores. The AI Agent uses the `get_health_scores` tool which delegates the logic to a Supabase Edge Function to compute moving averages and write snapshots.
 
 ```mermaid
@@ -227,7 +292,7 @@ stateDiagram-v2
   ReturnToAgent --> [*] : JSON result injected into Agent context
 ```
 
-## 8. AI Workout Plan Generation Flow
+## 9. AI Workout Plan Generation Flow
 Describes the state machine when the AI agent generates a structured workout plan. The agent selects exercises based on user context (profile, equipment, 1RM, split) and calls `generate_workout_plan` to persist the plan.
 
 ```mermaid
@@ -268,7 +333,7 @@ stateDiagram-v2
   DisplayPlan --> [*]
 ```
 
-## 9. Set-Level Exercise Logging & PR Detection Flow
+## 10. Set-Level Exercise Logging & PR Detection Flow
 Describes the state machine when a user reports what they actually did in a workout. Includes the dual-tool workflow (session-level `log_workout` → set-level `log_exercise_sets`), PR detection, and auto 1RM updates.
 
 ```mermaid
@@ -278,7 +343,24 @@ stateDiagram-v2
   UserReportsWorkout --> LogSession : Agent calls log_workout(type, duration, calories)
   LogSession --> CaptureSessionId : Returns workout_log_id (UUID)
   
-  CaptureSessionId --> LogExerciseSets : For each exercise reported
+  state SplitAdvanceSideEffect {
+    [*] --> FetchActiveSplit : Query workout_splits WHERE is_active = True
+    FetchActiveSplit --> NoSplit : No active split
+    FetchActiveSplit --> FetchSplitItems : Active split found (split_id, last_completed_order_index)
+    FetchSplitItems --> MatchWorkoutType : _normalize_day_name strips ordinal suffixes (1st, 2nd…)
+    MatchWorkoutType --> NoMatch : workout_type doesn't match any split_items
+    MatchWorkoutType --> DisambiguateDuplicates : Collect all matching positions
+    DisambiguateDuplicates --> PickNextAfterLast : Choose first match with order_index > last_completed
+    DisambiguateDuplicates --> WrapToFirst : All matches ≤ last_completed → wrap around
+    PickNextAfterLast --> CallAdvanceRPC : advance_split_position(user_id, order_index)
+    WrapToFirst --> CallAdvanceRPC
+    CallAdvanceRPC --> [*]
+    NoSplit --> [*]
+    NoMatch --> [*]
+  }
+
+  CaptureSessionId --> SplitAdvanceSideEffect : Non-fatal side effect
+  SplitAdvanceSideEffect --> LogExerciseSets : For each exercise reported
   
   state LogExerciseSets {
     [*] --> ParseSetsJSON : Parse [{weight_kg, reps, rpe?, is_warmup?, notes?}]
@@ -318,7 +400,7 @@ stateDiagram-v2
   ReportTrend --> [*]
 ```
 
-## 10. Progressive Overload Query Flow
+## 11. Progressive Overload Query Flow
 Describes the two query modes for progressive overload analysis: single-exercise (uses DB function) and all-exercises (in-code aggregation).
 
 ```mermaid
@@ -351,7 +433,7 @@ stateDiagram-v2
   ReportSummary --> [*]
 ```
 
-## 11. Muscle Volume Heatmap Query Flow
+## 12. Muscle Volume Heatmap Query Flow
 Describes how the weekly muscle volume data is computed by joining exercise logs with the workout plan to map exercises → target muscles.
 
 ```mermaid
@@ -377,4 +459,91 @@ stateDiagram-v2
   CallRPC --> DBFunction
   DBFunction --> ReturnResponse : {week_offset, muscle_volumes: [...]}
   ReturnResponse --> [*]
+```
+
+## 13. i18n Initialization Flow
+Describes how the client-side internationalization engine (`i18n.js`) bootstraps on page load, determining the active language and translating the DOM.
+
+```mermaid
+stateDiagram-v2
+  [*] --> DetermineLanguage
+
+  state DetermineLanguage {
+    [*] --> CheckLocalStorage : Read localStorage('nutrisync_lang')
+    CheckLocalStorage --> UseStored : Valid lang found ('en' or 'ar')
+    CheckLocalStorage --> CheckBrowser : No stored preference
+    CheckBrowser --> UseBrowser : navigator.language matches supported
+    CheckBrowser --> UseDefault : No match → 'en'
+  }
+
+  DetermineLanguage --> LoadEnglishFallback : Always fetch /static/locales/en.json
+
+  LoadEnglishFallback --> CheckActiveLocale : Is active language 'en'?
+  CheckActiveLocale --> UseEnglishAsActive : Yes — _strings = _fallback
+  CheckActiveLocale --> LoadActiveLocale : No — fetch /static/locales/{lang}.json
+
+  LoadActiveLocale --> ApplyDirection : Set <html dir> and <html lang>
+  UseEnglishAsActive --> ApplyDirection
+
+  ApplyDirection --> WaitForDOM : document.readyState === 'loading'?
+  ApplyDirection --> TranslateDOM : DOM already ready
+
+  WaitForDOM --> TranslateDOM : DOMContentLoaded fired
+
+  state TranslateDOM {
+    [*] --> ScanDataI18n : querySelectorAll('[data-i18n]') → textContent
+    ScanDataI18n --> ScanPlaceholders : querySelectorAll('[data-i18n-placeholder]') → placeholder
+    ScanPlaceholders --> ScanTitles : querySelectorAll('[data-i18n-title]') → title
+    ScanTitles --> ScanHTML : querySelectorAll('[data-i18n-html]') → innerHTML
+    ScanHTML --> [*]
+  }
+
+  TranslateDOM --> MarkReady : _ready = true, fire queued onI18nReady callbacks
+  MarkReady --> [*]
+```
+
+## 14. Language Switch Flow
+Describes the runtime state transition when a user changes language via the language switcher dropdown. Affects frontend DOM, CSS direction, localStorage, API payloads, and backend prompt selection.
+
+```mermaid
+stateDiagram-v2
+  [*] --> UserSelectsLanguage : Change <select id='lang-switcher'>
+
+  UserSelectsLanguage --> ValidateLang : setLang(newLang) called
+  ValidateLang --> FallbackToEn : Unsupported language code
+  ValidateLang --> PersistChoice : Valid ('en' or 'ar')
+  FallbackToEn --> PersistChoice : Use 'en'
+
+  PersistChoice --> SaveLocalStorage : localStorage.setItem('nutrisync_lang', lang)
+  SaveLocalStorage --> FetchLocale : fetch /static/locales/{lang}.json
+
+  FetchLocale --> UpdateStrings : Success — _strings = parsed JSON
+  FetchLocale --> UseFallback : Failure — _strings = _fallback (English)
+
+  UpdateStrings --> ApplyHTMLDirection : Set <html dir='rtl/ltr'> and <html lang>
+  UseFallback --> ApplyHTMLDirection
+
+  ApplyHTMLDirection --> RetranslateDOM : Scan all data-i18n* elements
+
+  state CSSReaction {
+    [*] --> LogicalPropertiesFlip : margin-inline-start, inset-inline-end etc. auto-flip
+    LogicalPropertiesFlip --> RTLOverrides : [dir=rtl] rules activate (Cairo font, bg-position)
+    RTLOverrides --> [*]
+  }
+
+  RetranslateDOM --> CSSReaction : Browser re-renders with new dir attribute
+  
+  CSSReaction --> DispatchEvent : CustomEvent('languagechange', {lang, dir})
+
+  state ModuleReactions {
+    [*] --> ScriptJSReacts : script.js updates dynamic text, Chart.js RTL options
+    [*] --> WorkoutCoachReacts : workout_coach.js updates HUD text, canvas direction
+  }
+
+  DispatchEvent --> ModuleReactions
+
+  ModuleReactions --> NextChatPayload : Subsequent /api/chat sends {language: newLang}
+  NextChatPayload --> BackendPrompt : runners.py reads state.language → loads system_{lang}.md
+  BackendPrompt --> AIRespondsInLanguage : Agent uses Arabic or English system prompt
+  AIRespondsInLanguage --> [*]
 ```

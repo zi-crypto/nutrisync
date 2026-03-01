@@ -5,7 +5,7 @@
 The purpose of this document is to define the software requirements for NutriSync, an AI-powered fitness and nutrition coaching platform. This document covers the backend services, frontend application, database schema, and external integrations.
 
 ### 1.2 Scope
-NutriSync is an application designed to help users track their nutrition, workouts, sleep, and body composition. It provides a chat-based AI coach that can answer questions, log data, and generate visual charts. A specific feature is the "Live Coach", a computer vision-based real-time form checker for exercises like squats, pushups, and pullups.
+NutriSync is an application designed to help users track their nutrition, workouts, sleep, and body composition. It provides a chat-based AI coach that can answer questions, log data, and generate visual charts. A specific feature is the "Live Coach", a computer vision-based real-time form checker for exercises like squats, pushups, and pullups. The application supports **full internationalization (i18n)** with English and Arabic (Egyptian dialect) including Right-to-Left (RTL) rendering.
 
 ### 1.3 Definitions, Acronyms, and Abbreviations
 - **ADK**: Agent Development Kit (Google ADK used for the AI Agent).
@@ -13,6 +13,8 @@ NutriSync is an application designed to help users track their nutrition, workou
 - **TDEE**: Total Daily Energy Expenditure.
 - **BMR**: Basal Metabolic Rate.
 - **TSS**: Training Stress Score (represented as Aerobic Training Stress).
+- **i18n**: Internationalization — the system for multi-language support.
+- **RTL**: Right-to-Left — text direction for Arabic and similar languages.
 
 ## 2. Overall Description
 ### 2.1 Product Perspective
@@ -33,15 +35,21 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 - **Set-Level Exercise Logging**: Logging individual exercises at the set level (weight × reps × RPE) with automatic PR detection (volume PR and weight PR axes), auto 1RM record updates, and session linking via `workout_log_id`.
 - **Progressive Overload Tracking**: Weekly estimated 1RM trends (Epley formula), total volume trends, muscle volume heatmaps (sets per muscle group per week), all-time PR records, and per-exercise history for data-driven training progression.
 - **User Health Scoring**: AI agent can invoke an Edge Function (`user-improvement-scorer`) to calculate user improvement health scores on demand.
+- **Internationalization (i18n) & RTL**: Full Arabic (Egyptian dialect) support with Right-to-Left rendering. Client-side i18n engine with 311 locale keys per language, language-aware AI prompts, CSS logical properties, RTL Canvas rendering, and Chart.js RTL support. Language preference persisted in database and localStorage.
+- **Exercise Video Demos**: AI agent cites working YouTube video links when discussing exercises, using `web_search` with `site:youtube.com` queries. Exercise names serve as clickable hyperlinks opening in new tabs.
+- **Custom Coach Naming**: Users can name their AI coach during onboarding (default: "NutriSync"). The coach name is injected into the system prompt via `{coach_name}` placeholder.
 
 ### 2.3 User Classes and Characteristics
 - **Standard User**: A fitness enthusiast or beginner looking to track habits, receive AI coaching, and analyze form via the Live Coach.
 
 ### 2.4 Operating Environment
-- **Backend**: Python 3 (FastAPI) utilizing google-adk runners and asyncpg.
-- **Frontend**: Modern Web Browser (supports WebRTC/Camera for MediaPipe, Canvas API, IndexedDB for caching, Chart.js for data visualization). Must support SpeechSynthesis API for voice feedback.
-- **Database**: Supabase PostgreSQL with PostgREST and Edge Functions.
+- **Backend**: Python 3.11 (FastAPI) utilizing google-adk runners and asyncpg. Timezone defaults to `Europe/Berlin`.
+- **Frontend**: Modern Web Browser (supports WebRTC/Camera for MediaPipe, Canvas API, IndexedDB for caching, Chart.js for data visualization). Must support SpeechSynthesis API for voice feedback. Must support CSS logical properties and `dir` attribute for RTL layouts.
+- **Database**: Supabase PostgreSQL with PostgREST, Supavisor connection pooler, and Edge Functions.
 - **LLM**: Google GenAI (`gemini-flash-latest`).
+- **Web Search**: Tavily API (via `tavily-python` SDK) for internet searches.
+- **Analytics**: PostHog EU Cloud (`posthog` Python SDK + JS SDK).
+- **Deployment**: Docker Compose with 4 services — `nutrisync` (application), `nginx-proxy` (reverse proxy + SSL termination), `acme-companion` (automated Let's Encrypt certificate provisioning), and `watchtower` (auto-update every 300 s). Served at `bot.ziadamer.com`.
 
 ## 3. Functional Requirements
 
@@ -51,12 +59,12 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 - **Postconditions**: User session is established and JWT token is managed.
 
 ### FR-USER-02: Onboarding & Profile Management
-- **Description**: New users must complete an onboarding flow capturing details like DOB, height, weight, target weight, fitness goal, experience, equipment, diet type, allergies, sport type, workout split, and 1RM records.
-- **Implementation**: Frontend maps to `POST /api/profile` to upsert the `user_profile` (including initializing `starting_weight_kg`), generates target macros, handles custom `workout_splits`/`split_items` via an **upsert pattern** (reuses the existing active split UUID if one exists, only creates a new split on first-time onboarding — this preserves the `workout_plan_exercises.split_id` FK and prevents orphaned plan data; `split_items` are replaced via delete-and-reinsert since no other tables FK to them), updates `user_1rm_records`, and persists the user's specific `equipment_list` to the `user_equipment` table (delete-and-reinsert pattern). Also logs any provided weight to `body_composition_logs`. Frontend fetches existing profile using `GET /api/profile/{user_id}` which also returns the equipment list. The equipment UI features a chip/tag selector with 72+ preset items organized by category (machines, free weights, cardio, accessories) across three tiers (Gym/Home/Bodyweight), plus support for custom equipment entries via a text input.
+- **Description**: New users must complete an onboarding flow capturing details like DOB, height, weight, target weight, fitness goal, experience, equipment, diet type, allergies, sport type, workout split, 1RM records, and coach name.
+- **Implementation**: Frontend maps to `POST /api/profile` to upsert the `user_profile` (including initializing `starting_weight_kg` and persisting `coach_name` and `language`), generates target macros, handles custom `workout_splits`/`split_items` via an **upsert pattern** (reuses the existing active split UUID if one exists, only creates a new split on first-time onboarding — this preserves the `workout_plan_exercises.split_id` FK and prevents orphaned plan data; `split_items` are replaced via delete-and-reinsert since no other tables FK to them), updates `user_1rm_records`, and persists the user's specific `equipment_list` to the `user_equipment` table (delete-and-reinsert pattern). Also logs any provided weight to `body_composition_logs`. Frontend fetches existing profile using `GET /api/profile/{user_id}` which also returns the equipment list. The equipment UI features a chip/tag selector with 72+ preset items organized by category (machines, free weights, cardio, accessories) across three tiers (Gym/Home/Bodyweight), plus support for custom equipment entries via a text input.
 
 ### FR-CHAT-01: Conversational AI Coach
 - **Description**: Users can chat with an AI coach that responds with text and charts.
-- **Context Injection**: The `runners.py` fetches user profile, daily goals, current functional time (Cairo timezone logic), persistent context notes, user equipment list, 1RM records, and the current workout plan in parallel via `ContextService` (6 `asyncio.gather` fetchers), and injects all 7 keys into the ADK session state via the `state_delta` parameter on `run_async()` (the ADK-recommended approach for `DatabaseSessionService` that persists state through the event system rather than direct `session.state` mutation). An `InstructionProvider` callback (`_build_instruction`) reads state keys and substitutes 7 placeholders (`{user_profile}`, `{daily_totals}`, `{current_time}`, `{active_notes}`, `{equipment_list}`, `{one_rm_records}`, `{workout_plan}`) into the system prompt template.
+- **Context Injection**: The `runners.py` fetches user profile, daily goals, current functional time (Cairo timezone logic), persistent context notes, user equipment list, 1RM records, split structure, and the current workout plan in parallel via `ContextService` (**7 `asyncio.gather` fetchers**), and injects all **10 keys** into the ADK session state via the `state_delta` parameter on `run_async()` (the ADK-recommended approach for `DatabaseSessionService` that persists state through the event system rather than direct `session.state` mutation). An `InstructionProvider` callback (`_build_instruction`) reads the `language` state key to select the correct prompt template (English or Arabic), then substitutes **9 placeholders** (`{user_profile}`, `{daily_totals}`, `{current_time}`, `{active_notes}`, `{equipment_list}`, `{one_rm_records}`, `{split_structure}`, `{workout_plan}`, `{coach_name}`) into the system prompt template.
 - **Image Support**: Users can upload images which are sent as base64 to the multi-modal GenAI model via data URIs.
 - **Concurrency**: Per-user `asyncio.Lock` prevents ADK session state race conditions.
 
@@ -79,7 +87,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
     - `log_exercise_sets(exercise_name, sets_json, workout_log_id?)`: Logs individual sets with weight/reps/RPE. Auto PR detection on two axes (volume PR: weight×reps, weight PR: heaviest weight). Auto-updates `user_1rm_records` via `_try_update_1rm` when 1-rep max sets are logged. Case-insensitive canonical name matching.
     - `get_exercise_history(exercise_name, days=30)`: Fetches chronological set history for progressive overload charts (limit 200 rows).
     - `get_progressive_overload_summary(exercise_name?, weeks=8)`: Single-exercise mode calls `get_exercise_progress` RPC for weekly e1RM/volume trends + all-time PRs. All-exercise mode aggregates in-code from recent logs.
-  - `web_search.py` (`web_search`): Perform Google searches.
+  - `web_search.py` (`web_search`): Perform live internet searches via the **Tavily API** (`TavilyClient`). Returns AI-generated answer summaries and source URLs. Used for exercise video demos (YouTube), branded food lookups, and real-time fact verification. Requires `TAVILY_API_KEY` environment variable.
   - `utils.py` (`get_health_scores`): Invokes the `user-improvement-scorer` Edge function on demand. Manages Cairo functional time and functional date offsets (4-hour shift).
   - **Total: 21 tools** registered to the `coach_agent` (up from 16 pre-workout-planning).
 
@@ -103,6 +111,22 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - **Cross-Contamination Filtering**: Prevents misidentifying poses. Squats check horizontal width (`<35%`). Pushups check vertical height (`<50%`). Pullups check hands above shoulders.
   - **Dynamic Range Calibration**: Dynamically calculates arm extension distance during a 3-second hold for pushups (plank) and pullups (straight hang) to adjust depth triggers.
   - `VoiceCoach` provides spoken feedback and debounces spammy non-rep audio.
+
+### FR-VISION-02: Live Coach Exercise Logging API
+- **Description**: The Live Coach frontend can persist completed exercise sets (tracked via MediaPipe pose detection) to the backend database, bypassing the chat interface.
+- **Endpoint**: `POST /api/live-coach/log`
+- **Request Model** (`LiveCoachLogRequest`):
+  - `user_id` (str, required): Supabase user UUID.
+  - `exercise_key` (str, required): Exercise identifier — one of `"squat"`, `"pushup"`, `"pullup"` (mapped via `LIVE_COACH_EXERCISE_MAP` to display names: `"Bodyweight Squats"`, `"Push-ups"`, `"Pull-ups"`).
+  - `reps` (int, required): Number of repetitions completed. Must be > 0.
+  - `weight_kg` (float, optional): Weight used. If null, falls back to the user's `weight_kg` from `user_profile` (bodyweight exercises).
+- **Implementation** (in `main.py`):
+  - Resolves the next `set_number` for the exercise on the current functional day (auto-incrementing).
+  - **PR Detection**: Two-axis PR check — volume PR (`weight_kg × reps` exceeds all-time best `volume_load`) and weight PR (`weight_kg` exceeds all-time best). Both exclude warmup sets.
+  - Inserts into `exercise_logs` with `notes = "Logged via Live Coach"`.
+  - Returns `{success, exercise_name, set_number, reps, weight_kg, volume_load, is_pr, pr_type}`.
+  - Tracks `api_live_coach_logged` event in PostHog with exercise, reps, weight, set number, PR metadata.
+- **Validation**: Returns HTTP 400 (`"error.reps_zero"`) if `reps <= 0`.
 
 ### FR-DATA-01: Chat History Persistence
 - **Description**: The system must persist chat history, including tool call artifacts and base64 chart payloads.
@@ -154,6 +178,33 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - `GET /api/progress/{user_id}?exercise=&weeks=8` → Single exercise: `{exercise, weekly_trend: [{week_start, best_e1rm, total_volume, total_sets, best_weight, best_reps, has_pr}], all_time_pr: {best_weight, best_volume_set, best_e1rm}}`. All exercises: `{exercises: [{exercise, total_sets, total_volume, best_weight, best_volume_set, pr_count, last_date}], total_tracked}`.
   - `GET /api/muscle-volume/{user_id}?week_offset=0` → `{week_offset, muscle_volumes: [{muscle_group, completed_sets}]}`
 
+### FR-I18N-01: Internationalization & RTL Support
+- **Description**: The application must support multiple UI languages with full Right-to-Left (RTL) layout for Arabic.
+- **Supported Languages**: English (`en`), Arabic — Egyptian dialect (`ar`).
+- **Frontend Implementation**:
+  - **i18n Engine** (`i18n.js`): Loads locale JSON files from `/static/locales/`. Public API: `t(key, params)`, `setLang(lang)`, `getLang()`, `getDir()`, `onI18nReady(cb)`. Persists language in `localStorage` (`nutrisync_lang`). Detects initial language from localStorage → browser → default. Always loads English as fallback. On switch: reloads locale, sets `<html dir>` and `<html lang>`, scans DOM for `data-i18n*` attributes, dispatches `languagechange` CustomEvent.
+  - **Locale Files** (`locales/en.json`, `locales/ar.json`): 311 keys each, flat key-value format. Namespaces: header, chat, auth, coach (UI/feedback/instruction/HUD/labels), tracker (plan/progress/volume/PRs), wizard (all 5 steps), feedback, profile, equipment categories, muscles, splits, units/time, language picker, error codes.
+  - **String Externalization**: `script.js` uses ~95+ `t()` calls; `workout_coach.js` uses ~30 `t()` calls. No hardcoded user-facing strings remain in JavaScript.
+  - **CSS Logical Properties**: 19 physical→logical conversions in `style.css` (e.g., `margin-left` → `margin-inline-start`). `[dir=rtl]` selector for font-family override (Cairo) and form control background-position flip.
+  - **Canvas RTL**: `workout_coach.js` `drawOverlayText` sets `ctx.direction` based on `getDir()`, adjusts `textAlign`, uses Cairo font for RTL, mirrors X positioning.
+  - **Chart.js RTL**: Conditional `x.reverse`, `y.position: 'right'`, `tooltip.rtl`, `legend.rtl` when `getDir() === 'rtl'`.
+  - **Language Switcher**: `<select id="lang-switcher">` in header, bound to `setLang()`.
+- **Backend Implementation**:
+  - **Language-Aware Prompts**: `runners.py` caches prompts in `_PROMPT_TEMPLATES: Dict[str, str]`. `_load_prompt_template(lang)` loads `prompts/system.md` (English) or `prompts/system_{lang}.md` (e.g., `system_ar.md` for Arabic) with English fallback. `_build_instruction` reads `ctx.state.get("language", "en")` to select the template.
+  - **Arabic System Prompt** (`prompts/system_ar.md`): Full Arabic (Egyptian dialect) translation of `system.md` with identical 17 protocols and 9 template placeholders. Instructs AI to always respond in Arabic.
+  - **API Language Fields**: `ChatRequest.language` (default `"en"`) propagated to `process_message()`. `ProfileRequest.language` (default `"en"`) saved to `user_profiles.language`.
+  - **Error Code i18n**: `HTTPException` detail strings use i18n key codes (e.g., `"error.reps_zero"`) instead of English text, enabling frontend `t()` mapping.
+- **Database**: Migration `014_add_language.sql` adds `language TEXT NOT NULL DEFAULT 'en'` to `user_profiles`.
+
+### FR-I18N-02: Exercise Video Demo Protocol
+- **Description**: The AI agent must cite working YouTube video demonstration links when discussing exercises in workout plans or form guidance.
+- **Implementation** (System Prompt Protocol #17):
+  - Agent uses `web_search` tool with `site:youtube.com {exercise_name} form tutorial` queries.
+  - Exercise name is rendered as the clickable hyperlink: `<a href="..." target="_blank"><b>Exercise Name</b></a>`.
+  - Multiple exercises are batched into a single search when possible.
+  - **Fallback**: Agent never hallucinate URLs — if search returns no results, omits the link gracefully.
+  - **Quality Filter**: Prioritizes reputable fitness channels (Jeff Nippard, Renaissance Periodization, AthleanX, etc.).
+
 ### FR-ANALYTICS-01: Product Analytics (PostHog)
 - **Description**: Dual-layer analytics capturing both frontend user interactions and backend system metrics for product insight.
 - **Configuration**:
@@ -177,13 +228,15 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 - **Resilience**: Backend analytics never block or crash the application — all captures wrapped in try/except. Missing API key gracefully disables analytics. Frontend checks `typeof posthog !== 'undefined'` before every capture.
 
 ## 4. Non-Functional Requirements
-- **Security**: Row Level Security (RLS) policies enforce isolated tenant access on all user-facing tables (including new `workout_plan_exercises` and `exercise_logs`). Context tools use `current_user_id` ContextVar to prevent prompt injection overriding user ID. The system prompt declares 6 XML context tags as UNTRUSTED DATA (`<user_profile>`, `<daily_totals>`, `<active_notes>`, `<equipment_list>`, `<one_rm_records>`, `<workout_plan>`) with explicit instructions to ignore any embedded prompt injection attempts.
-- **Performance**: High parallelization of DB queries in `ContextService` (6 concurrent async fetchers). ADK `DatabaseSessionService` `connect_args` configured with zero statement caching (`prepared_statement_cache_size=0`) for Supavisor compatibility. Exercise log queries use partial indexes (e.g., `WHERE is_warmup = false`) and composite indexes for efficient progressive overload calculations.
+- **Security**: Row Level Security (RLS) policies enforce isolated tenant access on all user-facing tables (including new `workout_plan_exercises` and `exercise_logs`). Context tools use `current_user_id` ContextVar to prevent prompt injection overriding user ID. The system prompt declares **7** XML context tags as UNTRUSTED DATA (`<user_profile>`, `<daily_totals>`, `<active_notes>`, `<equipment_list>`, `<one_rm_records>`, `<split_structure>`, `<workout_plan>`) with explicit instructions to ignore any embedded prompt injection attempts. The backend uses the Supabase `service_role` key which bypasses RLS and connects from server-side only; API keys are never exposed to the frontend.
+- **Model Configuration**: The AI agent uses `temperature=0.2` (`generate_content_config` in `agents/coach.py`) to ensure deterministic, reliable coaching responses.
+- **Performance**: High parallelization of DB queries in `ContextService` (7 concurrent async fetchers). ADK `DatabaseSessionService` `connect_args` configured with zero statement caching (`prepared_statement_cache_size=0`) for Supavisor compatibility. Exercise log queries use partial indexes (e.g., `WHERE is_warmup = false`) and composite indexes for efficient progressive overload calculations.
 - **Reliability**: Exponential Moving Average (EMA) smoothing inside the Live Coach (`MathUtils.calculateEMA`) mitigates camera jitter and false readings from MediaPipe. Graceful handling of QuickChart API timeouts. All new context fetchers include try/except with empty-list fallbacks to prevent single fetcher failures from blocking the entire context pipeline.
+- **Internationalization**: Full i18n coverage across frontend (311 locale keys, CSS logical properties, RTL Canvas, Chart.js RTL) and backend (language-aware prompts, i18n error codes). Language fallback to English is guaranteed at every layer (locale loading, prompt loading, error display). Language preference persisted in both `localStorage` (frontend) and `user_profiles.language` (database).
 
 ## 5. Data Requirements
 - **Core Entities**:
-  - `user_profile`: Central user state, demographics, current weight, and computed macro targets.
+  - `user_profile`: Central user state, demographics, current weight, computed macro targets, `coach_name` (custom AI coach name, default `'NutriSync'`), and `language` preference (`'en'` or `'ar'`, default `'en'`).
   - `daily_goals`: Tracks daily aggregates (calories, workouts) and target achievements.
   - `chat_history`: Message stream including system/tool calls.
   - `message_feedback`: Thumbs up/down and comments mapped to `message_id`.
@@ -201,12 +254,51 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - `sessions`, `app_states`, `user_states`, `events`, `adk_internal_metadata`: Tables managed internally by the Google ADK for agent session state and execution tracking.
 
 ## 6. External Interfaces
-- **Google GenAI API**: LLM provider for the conversational agent (`google.adk`).
-- **Supabase**: PostgreSQL database, Authentication (JWT), and Edge Functions (e.g., `user-improvement-scorer`).
-- **Google MediaPipe Pose**: In-browser client-side ML model download via JSDelivr CDN.
-- **QuickChart.io API**: External image generation service for Chart.js payloads.
-- **Web Speech API**: Browser-native voice synthesis for Live Coach.
+- **Google GenAI API**: LLM provider for the conversational agent via `google.adk` (`gemini-flash-latest`).
+- **Supabase**: PostgreSQL database, Authentication (JWT via Supabase JS Client on frontend), Edge Functions (e.g., `user-improvement-scorer`), and PostgREST auto-generated REST API.
+- **Google MediaPipe Pose**: In-browser client-side ML model for real-time pose detection (loaded via JSDelivr CDN).
+- **QuickChart.io API**: External HTTP API for server-side generation of Chart.js-based PNG chart images.
+- **Tavily API**: Web search API (`tavily-python` SDK) for live internet searches, YouTube exercise video lookups, branded food macro data, and real-time fact verification. Configured via `TAVILY_API_KEY` env var.
+- **Web Speech API**: Browser-native `SpeechSynthesis` for Live Coach voice feedback and rep counting.
 - **PostHog EU Cloud** (`eu.i.posthog.com`): Product analytics platform. Dual-layer integration:
   - *Frontend*: JS SDK loaded via Jinja2 template. Events routed through first-party nginx proxy (`/ingest/*` → PostHog EU) to bypass adblockers. Auto-captures pageviews, pageleaves, and clicks. Custom events track chat usage, auth, onboarding funnel, live coach sessions, feedback, and workout tracker engagement.
   - *Backend*: Python SDK (`posthog` package) singleton client in `services/analytics.py`. Captures server-side events invisible to the browser: API latency, AI tool invocations, agent run metrics, and profile saves. Configured via `POSTHOG_API_KEY` and `POSTHOG_HOST` environment variables.
   - *Nginx Proxy*: `nginx/vhost.d/bot.ziadamer.com` defines two `location` blocks (`/ingest/static/` and `/ingest/`) that proxy to `eu-assets.i.posthog.com` and `eu.i.posthog.com` respectively, with SNI, HTTP/1.1 keepalive, and forwarded client IP headers.
+
+## 7. Testing Infrastructure
+
+### 7.1 Test Framework
+- **Framework**: `pytest` with `pytest-asyncio` for async test support.
+- **Configuration**: `pytest.ini` in the project root.
+- **Fixtures**: `tests/conftest.py` provides shared test fixtures.
+
+### 7.2 Test Suites
+- **Unit Tests** (`tests/unit/`):
+  - `test_api_endpoints.py` — FastAPI endpoint response validation.
+  - `test_calculate_targets.py` — Mifflin-St Jeor macro/TDEE calculation logic.
+  - `test_query_user_logs.py` — Time-series query utility validation.
+  - `test_runner.py` — ADK Runner integration tests.
+- **Integration Tests** (`tests/`):
+  - `test_chart.py` — QuickChart.io chart generation integration.
+  - `test_google_fit.py` — Google Fit data fetching (with `setup_google_fit.py` helper).
+  - `verify_agent.py` — End-to-end agent verification script.
+  - `verify_env.py` — Environment variable and dependency verification.
+- **Database Setup** (`tests/`):
+  - `setup_db.sql` — Test database initialization.
+  - `migration_context_notes.sql`, `migration_triggers.sql`, `migration_workout_splits.sql` — Test migration scripts.
+- **Test Images** (`tests/test_images/`) — Sample images for multimodal input testing.
+
+## 8. Supplementary Components
+
+### 8.1 Trainer Demo Module (`nutrisync_adk/trainer/`)
+A standalone **Streamlit** application demonstrating pose estimation and exercise form analysis using MediaPipe. Not part of the main NutriSync deployment but serves as a research prototype and demo for the Live Coach feature.
+- **Entry Point**: `🏠️_Demo.py` (Streamlit multi-page app).
+- **Infrastructure**: Separate `Dockerfile`, `requirements.txt`, and `setup.sh`.
+- **Capabilities**: Frame-by-frame pose processing (`process_frame.py`), configurable angle thresholds (`thresholds.py`), and utility functions (`utils.py`).
+- **Origin**: Integrated from the `pradnya_repo/` research codebase (Apache License 2.0).
+
+### 8.2 Legacy N8N Implementation (`n8n_implementation/`)
+Historical workflow definitions from a prior architecture where NutriSync was built on **n8n** (workflow automation platform) before being rebuilt with Google ADK. These JSON files (`AddRow.json`, `DrawChart.json`, `GetHealthScores.json`, `MyHealthBrain.json`) are preserved for reference and are **not** part of the current system.
+
+### 8.3 Known Schema Discrepancy
+Migration `014_add_language.sql` targets table `user_profiles` (plural), but the actual production table is `user_profile` (singular). The `language` column does not appear in the current `user_profile` schema definition, suggesting this migration may target a different (or renamed) table or has not been applied. The `ProfileRequest.language` field is present in the API model but may not persist to the database if the column is missing.
