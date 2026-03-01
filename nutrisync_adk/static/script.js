@@ -520,7 +520,7 @@ class ChatApp {
             <div class="feedback-comment-section" style="display: none;">
                 <textarea class="feedback-textarea" placeholder="${t('feedback.placeholder')}" minlength="10"></textarea>
                 <div class="feedback-comment-footer">
-                    <span class="feedback-char-count">${t('feedback.char_count', {count: 0})}</span>
+                    <span class="feedback-char-count">${t('feedback.char_count', { count: 0 })}</span>
                     <button class="feedback-submit-btn" disabled>${t('feedback.submit')}</button>
                 </div>
                 <div class="feedback-error" style="display: none;"></div>
@@ -570,7 +570,7 @@ class ChatApp {
         // Character counter and validation
         textarea.addEventListener('input', () => {
             const len = textarea.value.trim().length;
-            charCount.textContent = t('feedback.char_count', {count: len});
+            charCount.textContent = t('feedback.char_count', { count: len });
             submitBtn.disabled = len < 10;
             if (len >= 10) {
                 charCount.classList.add('valid');
@@ -763,7 +763,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (reps > 0) {
             logExerciseBtn.classList.remove('hidden');
             logExerciseBtn.disabled = false;
-            logExerciseBtnText.textContent = t('coach.log_text', {reps, exercise: exLabel});
+            logExerciseBtnText.textContent = t('coach.log_text', { reps, exercise: exLabel });
         } else {
             logExerciseBtnText.textContent = t('coach.btn.log');
             logExerciseBtn.disabled = true;
@@ -793,7 +793,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Reset session stats when opening
             coachSetsLogged = 0;
             if (coachSessionStats) coachSessionStats.classList.add('hidden');
-            if (coachSessionSets) coachSessionSets.textContent = t('coach.label.sets_logged', {count: 0});
+            if (coachSessionSets) coachSessionSets.textContent = t('coach.label.sets_logged', { count: 0 });
             updateLogButton();
         });
     }
@@ -852,7 +852,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 logExerciseBtn.disabled = true;
                 coachSetsLogged = 0;
                 if (coachSessionStats) coachSessionStats.classList.add('hidden');
-                if (coachSessionSets) coachSessionSets.textContent = t('coach.label.sets_logged', {count: 0});
+                if (coachSessionSets) coachSessionSets.textContent = t('coach.label.sets_logged', { count: 0 });
             }
         });
     }
@@ -892,10 +892,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (resp.ok && data.success) {
                     coachSetsLogged++;
                     const prMsg = data.is_pr
-                        ? ` 🏆 ${t('coach.toast.new_pr', {type: data.pr_type.toUpperCase()})}`
+                        ? ` 🏆 ${t('coach.toast.new_pr', { type: data.pr_type.toUpperCase() })}`
                         : '';
                     showCoachToast(
-                        t('coach.toast.set_logged', {set: data.set_number, reps: data.reps, weight: data.weight_kg}) + prMsg,
+                        t('coach.toast.set_logged', { set: data.set_number, reps: data.reps, weight: data.weight_kg }) + prMsg,
                         true
                     );
                     // ── PostHog: Track live coach exercise logged ──
@@ -912,8 +912,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // Update session stats
                     coachSessionStats.classList.remove('hidden');
-                    coachSessionSets.textContent = t('coach.label.sets_logged', {count: coachSetsLogged});
-                    coachSessionRepsDisplay.textContent = t('coach.label.last_reps', {reps: data.reps});
+                    coachSessionSets.textContent = t('coach.label.sets_logged', { count: coachSetsLogged });
+                    coachSessionRepsDisplay.textContent = t('coach.label.last_reps', { reps: data.reps });
 
                     // Reset rep counter for next set
                     if (liveCoachSystem && liveCoachSystem.exerciseEngine && liveCoachSystem.exerciseEngine.currentProfile) {
@@ -1026,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         "Arnold Split": [t('splits.chest_back_1'), t('splits.shoulders_arms_1'), t('splits.legs_1'), t('splits.chest_back_2'), t('splits.shoulders_arms_2'), t('splits.legs_2'), t('splits.rest')],
         "PPL x2": [t('splits.push_1'), t('splits.pull_1'), t('splits.legs_1'), t('splits.push_2'), t('splits.pull_2'), t('splits.legs_2'), t('splits.rest')],
         "PPL + Rest (8-Day)": [t('splits.push'), t('splits.pull'), t('splits.legs'), t('splits.rest'), t('splits.push_2'), t('splits.pull_2'), t('splits.legs_2'), t('splits.rest')],
-        "Custom": [t('splits.day_n', {n: 1})]
+        "Custom": [t('splits.day_n', { n: 1 })]
     };
 
     function showStep(step) {
@@ -1048,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             wizardSubmitBtn.classList.add('hidden');
         }
 
-        wizardSubtitle.innerText = t('wizard.step_of', {current: step, total: totalSteps});
+        wizardSubtitle.innerText = t('wizard.step_of', { current: step, total: totalSteps });
     }
 
     // Split Editor Functions
@@ -1067,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             input.type = 'text';
             input.value = day;
             input.className = 'split-day-input';
-            input.placeholder = t('wizard.label.split_day', {n: index + 1});
+            input.placeholder = t('wizard.label.split_day', { n: index + 1 });
             input.style.flex = '1';
 
             const removeBtn = document.createElement('button');
@@ -1505,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const input = document.createElement('input');
             input.type = 'text';
-            input.value = t('splits.day_n', {n: count});
+            input.value = t('splits.day_n', { n: count });
             input.className = 'split-day-input';
             input.style.flex = '1';
 
@@ -1784,6 +1784,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Success
             onboardingOverlay.classList.add('hidden');
 
+            // Trigger Push Notification Opt-In after onboarding
+            initPushNotifications(userId);
+
             // ── PostHog: Track onboarding/profile save completed ──
             if (typeof posthog !== 'undefined') {
                 posthog.capture('onboarding_completed', {
@@ -1806,15 +1809,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             }
 
-            let msg = t('profile.saved', {name: formData.name});
+            let msg = t('profile.saved', { name: formData.name });
             if (resData.targets) {
-                msg += '\n' + t('profile.calorie_target', {calories: resData.targets.daily_calorie_target});
+                msg += '\n' + t('profile.calorie_target', { calories: resData.targets.daily_calorie_target });
             }
             alert(msg);
 
         } catch (error) {
             console.error("Profile Save Error:", error);
-            alert(t('profile.save_error', {error: error.message}));
+            alert(t('profile.save_error', { error: error.message }));
             wizardSubmitBtn.innerText = t('wizard.btn.finish');
         }
     });
@@ -1853,6 +1856,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     profileSection.classList.remove('hidden');
                     profileSection.style.display = 'flex';
                 }
+
+                // Trigger Push Notification Opt-In after login if supported
+                initPushNotifications(userId);
             }
         } catch (e) {
             console.error("Error checking profile:", e);
@@ -2141,7 +2147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Superset badge
                 let supersetHtml = '';
                 if (ex.superset_group != null) {
-                    supersetHtml = `<span class="wt-superset-badge">${t('tracker.plan.superset', {group: ex.superset_group})}</span>`;
+                    supersetHtml = `<span class="wt-superset-badge">${t('tracker.plan.superset', { group: ex.superset_group })}</span>`;
                 }
 
                 card.innerHTML = `
@@ -2431,7 +2437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const prHtml = w.has_pr ? ' <span class="wt-all-ex-pr-badge">🏆 PR</span>' : '';
                 html += `
                     <div class="wt-session-card">
-                        <div class="wt-session-date">${t('tracker.progress.week_of', {date: w.week_start})}${prHtml}</div>
+                        <div class="wt-session-date">${t('tracker.progress.week_of', { date: w.week_start })}${prHtml}</div>
                         <div class="wt-session-sets">
                             <span class="wt-set-pill${w.has_pr ? ' wt-pr-set' : ''}">${t('tracker.progress.best')} ${w.best_weight || 0}${t('units.kg')} × ${w.best_reps || 0}</span>
                             <span class="wt-set-pill">${t('tracker.progress.vol')} ${Math.round(w.total_volume || 0).toLocaleString()}${t('units.kg')}</span>
@@ -2574,7 +2580,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!label) return;
             if (this.weekOffset === 0) label.textContent = t('tracker.volume.this_week');
             else if (this.weekOffset === 1) label.textContent = t('tracker.volume.last_week');
-            else label.textContent = t('tracker.volume.weeks_ago', {n: this.weekOffset});
+            else label.textContent = t('tracker.volume.weeks_ago', { n: this.weekOffset });
         }
 
         _renderMuscleBars() {
@@ -2699,4 +2705,153 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         observer.observe(liveCoachToggleBtn, { attributes: true, attributeFilter: ['class'] });
     }
+
+    // Helper: Convert VAPID key to Uint8Array
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+    // --- Push Notifications Logic ---
+    async function initPushNotifications(userId) {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            console.log('Push messaging is not supported');
+            return;
+        }
+
+        try {
+            // Register SW silently
+            const registration = await navigator.serviceWorker.register('/static/service-worker.js');
+            console.log('Service Worker registered with scope:', registration.scope);
+
+            // Check if already subscribed
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+                console.log('User IS subscribed.');
+                return;
+            }
+
+            // Check if user previously declined permanently
+            if (Notification.permission === 'denied') {
+                console.log('Push notifications are denied.');
+                return;
+            }
+
+            // Show beautiful overlay to ask
+            const overlay = document.getElementById('notifications-overlay');
+            const enableBtn = document.getElementById('push-enable-btn');
+            const laterBtn = document.getElementById('push-maybe-later-btn');
+            const msgObj = document.getElementById('push-message');
+
+            if (overlay) overlay.classList.remove('hidden');
+
+            const hideOverlay = () => {
+                if (overlay) overlay.classList.add('hidden');
+            };
+
+            if (laterBtn) {
+                laterBtn.onclick = hideOverlay;
+            }
+
+            if (enableBtn) {
+                enableBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    if (enableBtn.disabled) return;
+
+                    const originalText = enableBtn.innerText;
+                    // Do NOT disable the button or modify the DOM here.
+                    // Doing so consumes the user-gesture token in Chromium/Safari, instantly auto-denying the prompt.
+
+                    try {
+                        let permissionResult = window.Notification ? window.Notification.permission : 'denied';
+
+                        // Only prompt if we haven't already been granted or denied
+                        if (permissionResult === 'default') {
+                            try {
+                                permissionResult = await Notification.requestPermission();
+                            } catch (err) {
+                                // Fallback for very old Safari
+                                permissionResult = await new Promise((resolve) => {
+                                    Notification.requestPermission(resolve);
+                                });
+                            }
+                        }
+
+                        if (permissionResult !== 'granted') {
+                            throw new Error(t('push.error.denied'));
+                        }
+
+                        // Now it is safe to disable the button since the prompt is handled
+                        enableBtn.disabled = true;
+
+                        // Get VAPID public key
+                        const meta = document.querySelector('meta[name="vapid-key"]');
+                        if (!meta || !meta.content) throw new Error('System Error: VAPID key not found in HTML.');
+
+                        let applicationServerKey;
+                        try {
+                            applicationServerKey = urlBase64ToUint8Array(meta.content);
+                        } catch (err) {
+                            throw new Error('System Error: Invalid VAPID key format.');
+                        }
+
+                        // Subscribe 
+                        const newSubscription = await registration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: applicationServerKey
+                        });
+
+                        const subJson = newSubscription.toJSON();
+
+                        // Send to Backend
+                        const resp = await fetch('/api/notifications/subscribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: userId,
+                                endpoint: subJson.endpoint,
+                                p256dh: subJson.keys.p256dh,
+                                auth: subJson.keys.auth
+                            })
+                        });
+
+                        if (!resp.ok) {
+                            const errText = await resp.text();
+                            throw new Error('Failed to save subscription on server: ' + errText);
+                        }
+
+                        if (msgObj) {
+                            msgObj.innerText = "Success! Notifications enabled.";
+                            msgObj.className = "auth-message success";
+                        }
+                        setTimeout(hideOverlay, 1500);
+
+                    } catch (err) {
+                        console.error('Failed to subscribe the user: ', err);
+                        if (msgObj) {
+                            msgObj.innerText = err.message || "Failed to subscribe.";
+                            msgObj.className = "auth-message error";
+                        }
+                        enableBtn.disabled = false;
+                        enableBtn.innerText = originalText;
+                    }
+                };
+            }
+
+        } catch (error) {
+            console.error('Service Worker Error', error);
+        }
+    }
+
 });
+

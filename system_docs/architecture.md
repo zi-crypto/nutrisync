@@ -22,6 +22,7 @@ C4Context
   System_Ext(quickchart, "QuickChart.io", "External API for generating chart images.")
   System_Ext(tavily, "Tavily", "Web search API for live internet queries, YouTube exercise video lookups, and branded food data.")
   System_Ext(posthog, "PostHog EU", "Product analytics platform (event tracking, user identification).")
+  System_Ext(web_push, "W3C Web Push Service", "Delivers native push notifications to subscribed devices.")
 
   Rel(user, nutrisync, "Uses", "HTTPS")
   Rel(nutrisync, supabase, "Authenticates, persists data, runs edge functions", "HTTPS/WSS")
@@ -31,6 +32,8 @@ C4Context
   Rel(user, mediapipe, "Runs pose detection locally", "Webcam/Browser")
   Rel(mediapipe, nutrisync, "Integrates tracking logic", "JS API")
   Rel(nutrisync, posthog, "Sends analytics events (frontend via nginx proxy, backend via Python SDK)", "HTTPS")
+  Rel(nutrisync, web_push, "Sends VAPID-signed push payloads", "HTTPS")
+  Rel(web_push, user, "Delivers OS-level notifications", "Push")
 ```
 
 ### 2.2 Container Level
@@ -43,8 +46,8 @@ C4Container
   Person(user, "User", "A user of the application")
   
   Container_Boundary(c1, "NutriSync Deployment Environment") {
-    Container(spa, "Single Page Web App", "Vanilla JS/HTML/CSS", "Provides chat interface, onboarding wizards, offline IndexedDB caching, and camera-based live coach.")
-    Container(api, "FastAPI Application", "Python/FastAPI", "Provides REST endpoints, orchestrates agent, serves static files.")
+    Container(spa, "PWA & Web App", "Vanilla JS/HTML/CSS", "Provides chat interface, wizards, offline IndexedDB caching, camera-based live coach, and Web Push Service Workers.")
+    Container(api, "FastAPI Application", "Python/FastAPI", "Provides REST endpoints, orchestrates agent, serves static files, schedules background push notifications.")
     Container(agent, "AI Coaching Agent", "Google ADK", "Processes chat and calls tools to query/mutate database.")
     Container(nginx, "Nginx Proxy", "Nginx", "Reverse proxy and SSL termination.")
   }
@@ -58,7 +61,7 @@ C4Container
   Rel(nginx, spa, "Delivers static files", "")
   Rel(nginx, api, "Proxies REST calls", "HTTP")
   
-  Rel(spa, api, "Makes API calls (/api/chat, /api/profile, /api/live-coach/log)", "JSON/HTTPS")
+  Rel(spa, api, "Makes API calls (/api/chat, /api/profile, /api/notifications)", "JSON/HTTPS")
   Rel(spa, supabase, "Authenticates", "Supabase JS Client")
   
   Rel(api, agent, "Invokes via Runners", "Memory")
@@ -94,8 +97,9 @@ C4Component
         Component(tool_utils, "utils.py", "Python", "Database client, time logic, get_health_scores.")
     }
     
-    Component(context_svc, "Context Service (local_context.py)", "Python", "Fetches dynamic user data (profile, goals, notes, equipment, 1RM records, workout plan, split structure) in parallel (7 async fetchers) for the prompt.")
+    Component(context_svc, "Context Service (local_context.py)", "Python", "Fetches dynamic user data in parallel (7 async fetchers) for the prompt.")
     Component(history_svc, "History Service (history_service.py)", "Python", "Manages dual-write chat/tool history and retrieval.")
+    Component(notif_svc, "Notification Service (notifications.py)", "Python & pywebpush", "Runs APScheduler heuristics (Morning, Afternoon, Evening, Night, Bi-Weekly Body Comp) to dispatch Push Notifications.")
   }
 
   System_Ext(db, "Supabase DB", "PostgreSQL")
@@ -122,12 +126,12 @@ C4Component
 ## 3. Internal Component Breakdown
 
 ### Frontend (Static Files in `nutrisync_adk/static/`)
-- **`index.html`**: The single HTML shell, managing layout overlays (Auth, Chat View, Onboarding Wizard, Live Coach, Workout Tracker). All visible text elements are tagged with `data-i18n` attributes for i18n. Loads both Inter (LTR) and Cairo (Arabic/RTL) Google Fonts. Includes a `<select id="lang-switcher">` language picker in the header. Inline directional styles use CSS logical properties (`inset-inline-end`, `margin-inline-start`).
-- **`i18n.js`** (NEW): Client-side internationalization engine. Public API: `window.t(key, params)` for translation with `{placeholder}` interpolation, `window.setLang(lang)`, `window.getLang()`, `window.getDir()`, `window.onI18nReady(cb)`. Loads locale JSON files from `/static/locales/`. Persists language preference in `localStorage` (`nutrisync_lang`). On language switch: reloads locale, sets `<html dir>` and `<html lang>` attributes, auto-scans DOM for `data-i18n` / `data-i18n-placeholder` / `data-i18n-title` / `data-i18n-html` attributes, and dispatches a `languagechange` CustomEvent so other modules can react. English is always loaded as fallback. Bootstrap detects language from localStorage → browser language → default (`en`).
-- **`locales/en.json` & `locales/ar.json`** (NEW): 311 translation keys each covering all UI text — header, chat, auth, coach (UI/feedback/instruction/HUD/labels), tracker (plan/progress/volume/PRs), wizard (all 5 steps), feedback, profile, equipment categories, muscles, splits, units/time, language picker, and backend error codes.
-- **`script.js`**: Controls UI state transitions, API network calls to FastAPI, markdown rendering (KaTeX + Marked), IndexedDB local caching (`ChatCache`), message feedback UI, Supabase Auth session management, and the `WorkoutTracker` frontend module (Plan tab grouping, Progress tab charts via Chart.js, Volume Heatmap tab). Now includes ~95+ `t()` translation calls throughout (auth, chat, feedback, coach, wizard, validation, equipment, workout tracker). Sends `language` field in chat API payload and profile save payload. Chart.js charts include RTL support (x-axis `reverse`, y-axis `position: 'right'`, tooltip/legend `rtl` options). Equipment category lookups use `t()`. Initializes the language switcher and listens for `languagechange` events.
-- **`workout_coach.js`**: Integrates `MediaPipe/pose` library via camera stream to track angles and repetitions locally. Implements SOLID principles via `CameraManager`, `PoseEstimationService`, `UIRenderer`, `ExerciseEngine`, and specific profiles (`SquatProfile`, `PushupProfile`, `PullProfile`). Features dynamic range calibration and cross-contamination filtering. Now includes ~30 `t()` calls for exercise feedback, instructions, labels, and HUD text. RTL-aware `drawOverlayText` method sets `ctx.direction` and `textAlign` based on current language direction, uses Cairo font for Arabic, and mirrors X positioning for RTL layouts.
-- **`style.css`**: Provides the premium Google Glassmorphism UI styling, including specialized styling for the Workout Tracker tabs, exercise cards, and progress bars. Now uses CSS logical properties throughout (19 physical→logical conversions: `margin-inline-start`, `padding-inline-end`, `inset-inline-end`, `border-start-start-radius`, etc.). Includes Cairo in the `--font-family` variable. Provides `[dir=rtl]` overrides for font-family and form select background-position flip. Language switcher `.lang-switcher` styling.
+- **`manifest.json` & `service-worker.js`**: PWA implementation enabling installability and background `push` event listening. The Service Worker receives encrypted messaging (VAPID payload) and displays native OS notifications via `self.registration.showNotification`.
+- **`index.html`**: The single HTML shell, managing layout overlays (Auth, Chat View, Wizard, Live Coach, Workout Tracker, Push Notification Opt-In). All visible text elements are tagged with `data-i18n`. Includes RTL direction mapping.
+- **`script.js`**: Controls UI state transitions, API network calls, markdown rendering (KaTeX + Marked), IndexedDB local caching (`ChatCache`), message feedback UI, Supabase Auth session management, Push Notification Subscriptions (`initPushNotifications`), and the `WorkoutTracker` frontend module.
+- **`workout_coach.js`**: Integrates `MediaPipe/pose` library via camera stream to track angles and repetitions locally.
+- **`i18n.js`** & **`locales/*.json`**: Client-side internationalization engine parsing English (`en`) and Arabic (`ar`) translations for ~311 string keys (including Notification UI errors).
+- **`style.css`**: Provides the premium Google Glassmorphism UI styling, RTL physical→logical properties overrides, and specialized custom Notification Opt-In modal logic designed to secure the user gesture token prior to calling the native browser permission prompt.
 
 ### Analytics (PostHog)
 NutriSync uses **PostHog** (EU Cloud) for product analytics with a dual-layer architecture:
@@ -170,11 +174,12 @@ The frontend JS SDK sends events to `/ingest/*` on the same domain (`bot.ziadame
 - Passes `X-Forwarded-For` and `X-Forwarded-Host` for accurate geo-IP attribution.
 
 ### Backend Services (`nutrisync_adk/`)
-- **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/chat/feedback`, `/api/live-coach/log`, `/api/workout-plan/{user_id}`, `/api/progress/{user_id}`, `/api/muscle-volume/{user_id}`, `/health`, `/`, `/favicon.ico`) and offline calculation of physiological formulas (Mifflin-St Jeor equation for macros/TDEE). Handles base64 data URI image decoding. Serves `index.html` via **Jinja2** template rendering (injecting PostHog API key and host). The `/api/live-coach/log` endpoint receives exercise data from the MediaPipe-based Live Coach (exercise key, reps, optional weight), resolves set numbering, performs PR detection, and inserts into `exercise_logs`. The 3 workout data endpoints query `workout_plan_exercises`, `exercise_logs`, and the `get_exercise_progress`/`get_weekly_muscle_volume` DB functions directly. **Workout split handling** uses an upsert pattern: `POST /api/profile` reuses the existing active split UUID when one exists (updating name and replacing `split_items`), and only creates a new split row on first-time onboarding — this preserves `workout_plan_exercises.split_id` FK integrity across profile saves. The `ChatRequest` and `ProfileRequest` Pydantic models both include a `language` field (default `"en"`) which propagates the user's language preference to the backend. Error responses from `HTTPException` use i18n error code keys (e.g., `"error.reps_zero"`, `"error.missing_exercise_name"`) rather than English strings, enabling the frontend to map them to localized messages via `t()`.
-- **Runners (`runners.py`)**: Responsible for connecting the FastAPI requests to the ADK Agent, managing asynchronous database sessions utilizing `DatabaseSessionService`, and applying per-user `asyncio.Lock` mechanisms to prevent race conditions during ADK state updates. Uses `state_delta` parameter in `run_async()` (rather than direct `session.state` mutation) to inject **10 dynamic context keys** (`language`, `coach_name`, `user_profile`, `daily_totals`, `current_time`, `active_notes`, `equipment_list`, `one_rm_records`, `split_structure`, `workout_plan`) into the ADK session state per the official ADK best practice for `DatabaseSessionService`. The `_build_instruction` InstructionProvider callback reads `ctx.state.get("language", "en")` to select the appropriate prompt template, then substitutes **9 `{placeholder}` tokens** (`{user_profile}`, `{daily_totals}`, `{current_time}`, `{active_notes}`, `{equipment_list}`, `{one_rm_records}`, `{split_structure}`, `{workout_plan}`, `{coach_name}`) into the system prompt. Multi-language prompt loading is handled via a `_PROMPT_TEMPLATES: Dict[str, str]` cache — `_load_prompt_template(lang)` loads `prompts/system.md` (English) or `prompts/system_{lang}.md` (e.g., `system_ar.md` for Arabic) with English fallback on missing files.
-- **Agent Sandbox (`agents/coach.py`)**: Agent configuration mapping the `gemini-flash-latest` model and 21 distinct tools registered to the `coach_agent`. The 5 newest tools cover workout plan generation, set-level exercise logging with PR detection, exercise history retrieval, and progressive overload trend analysis.
-- **Context & History Services (`services/`)**: `local_context.py` loads `user_profile`, `daily_goals`, `persistent_context`, `user_equipment`, `user_1rm_records`, `workout_plan_exercises`, and `split_structure` (workout_splits + split_items) simultaneously via `asyncio.gather` (**7 parallel fetchers**). `history_service.py` manages chronological chat and tool history dual-writes.
-- **Tools (`tools/`)**: Modular python files encapsulating domain-specific logic. They use `get_current_functional_time()` in `utils.py` to correctly map late-night entries (e.g., 2 AM) to the functional prior calendar day. `charts.py` builds fully tailored Chart.js configurations and converts them to images via QuickChart. `workouts.py` contains science-based constants (`VOLUME_TABLE` with Schoenfeld dose-response volume landmarks per experience level, `GOAL_REP_RANGES` with load %1RM per goal, `SPLIT_MUSCLE_MAP` with 16 split types including Arnold Split) and implements structured superset support via `superset_group`.
+- **Main (`main.py`)**: Responsible for API route definitions (`/api/chat`, `/api/profile`, `/api/history/{guest_id}`, `/api/notifications/subscribe`, `/api/notifications/test-trigger`) and offline calculation of physiological formulas. Hosts the `APScheduler` loop running background cron jobs for Morning/Afternoon/Evening/Night and Bi-Weekly notification heuristical checks. Serves `index.html` via **Jinja2** template. 
+- **Notification Service (`services/notifications.py`)**: Interacts securely with the W3C Push Service utilizing VAPID authentication keys (from `.env`), calculating personalized gaps in `sleep_logs`, `nutrition_logs`, `body_composition_logs`, and dynamically polling `workout_logs` matched against `split_structure` to dispatch personalized push messages effectively bypassing LLM-inference costs.
+- **Runners (`runners.py`)**: Responsible for connecting the FastAPI requests to the ADK Agent, managing asynchronous database sessions utilizing `DatabaseSessionService`, and injecting **10 dynamic context keys**.
+- **Agent Sandbox (`agents/coach.py`)**: Agent configuration mapping the `gemini-flash-latest` model and 21 distinct tools registered to the `coach_agent`.
+- **Context & History Services (`services/`)**: `local_context.py` loads user graphs. `history_service.py` records history events.
+- **Tools (`tools/`)**: Modular python files encapsulating domain-specific logic. They use `get_current_functional_time()` in `utils.py` to correctly map late-night entries (e.g., 2 AM) to the functional prior calendar day.
 - **System Prompts (`prompts/`)**: Contains language-specific AI system prompt templates.
   - `system.md` — English system prompt with 17 protocols (including Protocol 17: Exercise Video Demo Protocol for YouTube exercise links via `web_search`). Template placeholders: `{user_profile}`, `{daily_totals}`, `{current_time}`, `{active_notes}`, `{equipment_list}`, `{one_rm_records}`, `{split_structure}`, `{workout_plan}`, `{coach_name}`.
   - `system_ar.md` — Full Arabic (Egyptian dialect) system prompt translation with identical 17 protocols and template placeholders. Instructs the AI to always respond in Arabic (Egyptian dialect).

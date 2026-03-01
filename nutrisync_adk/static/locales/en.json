@@ -1,6 +1,5 @@
 {
   "dir": "ltr",
-
   "header.logo": "NutriSync",
   "header.status": "Online",
   "header.title.workout_tracker": "Workout Tracker",
@@ -10,11 +9,9 @@
   "header.title.send": "Send",
   "header.title.sign_out": "Sign Out",
   "header.title.give_feedback": "Give feedback",
-
   "chat.welcome": "Hello! I'm your NutriSync coach. How can I help you today?",
   "chat.placeholder": "Type your message...",
   "chat.error": "**Error**: Failed to communicate with the server. ({error})",
-
   "auth.title.signin": "Welcome to NutriSync",
   "auth.title.signup": "Create Account",
   "auth.title.welcome_back": "Welcome Back",
@@ -31,7 +28,6 @@
   "auth.msg.account_created": "Account created! Signing you in...",
   "auth.msg.check_email": "Check your email for the confirmation link!",
   "auth.msg.password_short": "Password must be at least 8 characters",
-
   "coach.title": "NutriSync Live Coach",
   "coach.subtitle": "Ensure your full body is visible in the camera.",
   "coach.label.exercise": "Exercise:",
@@ -55,14 +51,12 @@
   "coach.log_text": "Log {reps} rep(s) — {exercise}",
   "coach.log_failed": "Failed to log exercise.",
   "coach.camera_error": "Unable to access camera: {error}",
-
   "coach.hud.reps": "Reps: {count}",
   "coach.hud.stage": "Stage: {stage}",
   "coach.hud.feedback": "Feedback: {text}",
   "coach.hud.angle": "{label}: {angle}",
   "coach.hud.no_pose": "No Pose Detected",
   "coach.hud.knee_angle": "Knee Angle",
-
   "coach.feedback.ready": "Ready",
   "coach.feedback.squat_deeper": "Squat deeper next time.",
   "coach.feedback.good_depth_push_up": "Good depth, push up!",
@@ -79,7 +73,6 @@
   "coach.feedback.reach_hands_up": "Reach hands UP for pullups!",
   "coach.feedback.pull_higher": "Pull higher!",
   "coach.feedback.good_pull": "Good pull",
-
   "coach.instruction.squat": "Camera placement: Waist height, direct side view.",
   "coach.instruction.pushup": "Camera placement: Floor level, 45-degree angle side view.",
   "coach.instruction.pushup_setup": "Keep arms perfectly straight in plank for 3 seconds.",
@@ -87,11 +80,9 @@
   "coach.instruction.pullup_setup": "Keep arms perfectly straight over head for 3 seconds.",
   "coach.label.setup": "Setup",
   "coach.label.elbow_angle": "Elbow Angle",
-
   "tracker.tab.plan": "📋 Plan",
   "tracker.tab.progress": "📈 Progress",
   "tracker.tab.volume": "🔥 Volume",
-
   "tracker.plan.title": "📋 My Workout Plan",
   "tracker.plan.regenerate": "🔄 Regenerate Plan",
   "tracker.plan.regenerate_title": "Ask AI to regenerate plan",
@@ -110,7 +101,6 @@
   "tracker.plan.no_data": "No data.",
   "tracker.plan.could_not_load": "Could not load history.",
   "tracker.plan.volume_summary": "📊 Volume Summary:",
-
   "tracker.progress.title": "📈 Progressive Overload Tracker",
   "tracker.progress.weeks_4": "4 weeks",
   "tracker.progress.weeks_8": "8 weeks",
@@ -130,12 +120,10 @@
   "tracker.progress.empty_hint": "Start logging sets via the AI coach to see your progress.",
   "tracker.progress.chart_e1rm": "Est. 1RM (kg)",
   "tracker.progress.chart_volume": "Volume (kg)",
-
   "tracker.pr.title": "🏆 Personal Records",
   "tracker.pr.best_e1rm": "Best Est. 1RM:",
   "tracker.pr.best_set": "Best Set:",
   "tracker.pr.best_volume_set": "Best Volume (set):",
-
   "tracker.volume.title": "🔥 Weekly Muscle Volume",
   "tracker.volume.this_week": "This Week",
   "tracker.volume.last_week": "Last Week",
@@ -145,7 +133,6 @@
   "tracker.volume.legend_done": "Done",
   "tracker.volume.legend_remaining": "Remaining",
   "tracker.volume.legend_info": "Target based on experience level + goal",
-
   "splits.push": "Push",
   "splits.pull": "Pull",
   "splits.legs": "Legs",
@@ -172,11 +159,9 @@
   "splits.push_2": "Push (2nd)",
   "splits.pull_2": "Pull (2nd)",
   "splits.day_n": "Day {n}",
-
   "tracker.stat.sets": "sets",
   "tracker.stat.vol_kg": "vol (kg)",
   "tracker.stat.best": "best",
-
   "wizard.title.onboarding": "Let's get to know you",
   "wizard.title.update": "Update Profile",
   "wizard.step_of": "Step {current} of {total}",
@@ -185,13 +170,11 @@
   "wizard.btn.finish": "Finish",
   "wizard.btn.cancel": "Cancel",
   "wizard.btn.saving": "Saving...",
-
   "wizard.label.name": "What should we call you?",
   "wizard.placeholder.name": "Your Name",
   "wizard.label.coach_name": "Name your Coach",
   "wizard.placeholder.coach_name": "NutriSync",
   "wizard.hint.coach_name": "Give your AI coach a name — or keep the default.",
-
   "wizard.label.gender": "Gender",
   "wizard.option.gender.male": "Male",
   "wizard.option.gender.female": "Female",
@@ -200,7 +183,6 @@
   "wizard.placeholder.height": "175",
   "wizard.label.weight": "Weight (kg)",
   "wizard.placeholder.weight": "70",
-
   "wizard.label.goal": "Fitness Goal",
   "wizard.option.goal.lose_weight": "Lose Weight",
   "wizard.option.goal.build_muscle": "Build Muscle",
@@ -212,7 +194,6 @@
   "wizard.option.experience.beginner": "Beginner (0-1 years)",
   "wizard.option.experience.intermediate": "Intermediate (1-3 years)",
   "wizard.option.experience.advanced": "Advanced (3+ years)",
-
   "wizard.label.sport": "Main Activity / Sport",
   "wizard.option.sport.gym": "Gym / Bodybuilding",
   "wizard.option.sport.running": "Running",
@@ -249,7 +230,6 @@
   "wizard.placeholder.1rm_weight": "Weight (kg)",
   "wizard.btn.add_1rm": "+ Add 1RM Record",
   "wizard.label.split_day": "Day {n}",
-
   "wizard.label.diet_type": "Typical Diet Type",
   "wizard.option.diet.balanced": "Balanced / Standard",
   "wizard.option.diet.low_carb": "Low Carb",
@@ -263,7 +243,11 @@
   "wizard.hint.calories": "We'll estimate this based on your stats if unsure.",
   "wizard.label.allergies": "Allergies / Intolerances",
   "wizard.placeholder.allergies": "e.g. Peanuts, Gluten, Dairy (Optional)",
-
+  "push.title": "Enable Reminders",
+  "push.subtitle": "Get personalized reminders for workouts and meals to stay on track.",
+  "push.enable": "Enable Reminders",
+  "push.later": "Maybe Later",
+  "push.error.denied": "We need permission to send notifications. You may need to unblock notifications in your browser's site settings since you are in incognito mode/have blocked them.",
   "validation.dob_future": "Date of birth cannot be in the future.",
   "validation.dob_range": "Please enter a valid date of birth (Age 10-120).",
   "validation.height_range": "Please enter a valid height in cm (50-300).",
@@ -275,7 +259,6 @@
   "validation.days_min": "Workout days per week must be at least 1.",
   "validation.calories_range": "Please enter a realistic daily calorie estimate (500 - 10,000).",
   "validation.feedback_min_chars": "Please write at least 10 characters.",
-
   "feedback.header": "Rate this response",
   "feedback.like": "Like",
   "feedback.dislike": "Dislike",
@@ -285,12 +268,10 @@
   "feedback.sending": "Sending...",
   "feedback.error": "Failed to save feedback. Please try again.",
   "feedback.thanks": "Thanks for your feedback!",
-
   "profile.saved": "Profile saved! Welcome, {name}.",
   "profile.calorie_target": "Calorie Target: {calories} kcal",
   "profile.save_error": "Error saving profile: {error}",
   "profile.days_auto_derived": "Auto-derived from your split schedule",
-
   "equipment.category.chest_arms_machines": "Chest & Arms Machines",
   "equipment.category.shoulder_machines": "Shoulder Machines",
   "equipment.category.back_machines": "Back Machines",
@@ -306,7 +287,6 @@
   "equipment.category.bodyweight_accessories": "Bodyweight & Accessories",
   "equipment.category.bodyweight_equipment": "Bodyweight Equipment",
   "equipment.category.custom": "Custom",
-
   "muscle.chest": "Chest",
   "muscle.back": "Back",
   "muscle.quads": "Quads",
@@ -322,17 +302,14 @@
   "muscle.rear_delts": "Rear Delts",
   "muscle.forearms": "Forearms",
   "muscle.traps": "Traps",
-
   "time.min": "min",
   "time.seconds_short": "s",
   "units.kg": "kg",
   "units.reps": "reps",
   "units.sets": "sets",
-
   "lang.picker_label": "Language",
   "lang.en": "English",
   "lang.ar": "العربية",
-
   "error.feedback_comment_short": "Feedback comment must be at least 10 characters long.",
   "error.feedback_value_invalid": "Feedback value must be 1 (like) or -1 (dislike).",
   "error.reps_zero": "Reps must be greater than 0.",

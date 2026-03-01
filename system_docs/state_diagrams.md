@@ -547,3 +547,60 @@ stateDiagram-v2
   BackendPrompt --> AIRespondsInLanguage : Agent uses Arabic or English system prompt
   AIRespondsInLanguage --> [*]
 ```
+
+## 15. PWA Push Notification Subscription & Delivery Flow
+Describes the state transitions of the PWA Notification architecture, starting from the custom frontend opt-in heuristic to securely subscribing the VAPID worker and delivering messages asynchronously.
+
+```mermaid
+stateDiagram-v2
+  [*] --> DetectServiceWorker
+  
+  DetectServiceWorker --> RegisterSW : navigator.serviceWorker.register
+  DetectServiceWorker --> SkipNotif : Browser doesn't support Service Workers
+  
+  RegisterSW --> CheckExistingPermission : Notification.permission
+  CheckExistingPermission --> SkipNotif : 'denied' or 'granted' (Already handled)
+  CheckExistingPermission --> ShowBeautifulOverlay : 'default' (First time asking)
+
+  state OptInHeuristic {
+    [*] --> RenderOverlay : Display custom "Enable Reminders" glassmorphism modal
+    RenderOverlay --> UserClicksNo : Reject natively
+    RenderOverlay --> UserClicksYes : Engage explicitly
+  }
+
+  ShowBeautifulOverlay --> OptInHeuristic
+  
+  UserClicksNo --> ModalClosed : State remembered
+  UserClicksYes --> NativeBrowserPrompt : Notification.requestPermission() initiated safely via direct user gesture loop
+  
+  NativeBrowserPrompt --> PermissionGranted
+  NativeBrowserPrompt --> PermissionDenied
+  
+  PermissionGranted --> AcquirePushSubscription : swRegistration.pushManager.subscribe(VAPID_PUBLIC_KEY)
+  
+  AcquirePushSubscription --> SendToBackend : POST /api/notifications/subscribe (endpoint, p256dh, auth)
+  SendToBackend --> SaveToDB : Upsert to `push_subscriptions`
+  SaveToDB --> ModalClosed : Subscription Complete
+  
+  PermissionDenied --> IncognitoFallbackCheck : If blocked strictly, render localized alert ("Incognito mode blocks this")
+  IncognitoFallbackCheck --> ModalClosed
+  ModalClosed --> [*]
+
+  %% --- Delivery ---
+  
+  state ServerDelivery {
+     [*] --> APSchedulerPulse : Daily Cron (8 AM Bi-Weekly, 9 AM, 2 PM, 8 PM, 10 PM)
+     APSchedulerPulse --> EvaluateHeuristics : e.g., run_night_check()
+     EvaluateHeuristics --> CalculateMacros : missing >150 kcal or >15g protein?
+     CalculateMacros --> SkipSend : Goals Met / Entry Found
+     CalculateMacros --> DispatchWebPush : Pywebpush signs VAPID JWT + encrypts payload
+     DispatchWebPush --> W3C_Push_Service : Transmit payload to Google/Mozilla/Apple push servers
+  }
+
+  W3C_Push_Service --> ServiceWorkerContext : Push event fired in background
+  ServiceWorkerContext --> self.registration.showNotification : Renders native OS notification
+  self.registration.showNotification --> [*]
+  SkipSend --> [*]
+  SkipNotif --> [*]
+```
+

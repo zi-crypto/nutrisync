@@ -1,6 +1,5 @@
 {
   "dir": "rtl",
-
   "header.logo": "نيوتري سينك",
   "header.status": "متصل",
   "header.title.workout_tracker": "متتبع التمارين",
@@ -10,11 +9,9 @@
   "header.title.send": "إرسال",
   "header.title.sign_out": "تسجيل الخروج",
   "header.title.give_feedback": "أعطِ رأيك",
-
   "chat.welcome": "مرحباً! أنا مدربك في نيوتري سينك. كيف يمكنني مساعدتك اليوم؟",
   "chat.placeholder": "اكتب رسالتك...",
   "chat.error": "**خطأ**: فشل الاتصال بالخادم. ({error})",
-
   "auth.title.signin": "مرحباً بك في نيوتري سينك",
   "auth.title.signup": "إنشاء حساب",
   "auth.title.welcome_back": "مرحباً بعودتك",
@@ -31,7 +28,6 @@
   "auth.msg.account_created": "تم إنشاء الحساب! جارٍ تسجيل دخولك...",
   "auth.msg.check_email": "تحقق من بريدك الإلكتروني لرابط التأكيد!",
   "auth.msg.password_short": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
-
   "coach.title": "المدرب المباشر - نيوتري سينك",
   "coach.subtitle": "تأكد أن جسمك بالكامل ظاهر في الكاميرا.",
   "coach.label.exercise": "التمرين:",
@@ -55,14 +51,12 @@
   "coach.log_text": "تسجيل {reps} تكرار — {exercise}",
   "coach.log_failed": "فشل تسجيل التمرين.",
   "coach.camera_error": "تعذر الوصول إلى الكاميرا: {error}",
-
   "coach.hud.reps": "التكرارات: {count}",
   "coach.hud.stage": "المرحلة: {stage}",
   "coach.hud.feedback": "التقييم: {text}",
   "coach.hud.angle": "{label}: {angle}",
   "coach.hud.no_pose": "لم يتم اكتشاف وضعية",
   "coach.hud.knee_angle": "زاوية الركبة",
-
   "coach.feedback.ready": "جاهز",
   "coach.feedback.squat_deeper": "انزل أعمق في المرة القادمة.",
   "coach.feedback.good_depth_push_up": "عمق ممتاز، ادفع للأعلى!",
@@ -79,7 +73,6 @@
   "coach.feedback.reach_hands_up": "ارفع يديك للأعلى للعقلة!",
   "coach.feedback.pull_higher": "اسحب أعلى!",
   "coach.feedback.good_pull": "سحب ممتاز",
-
   "coach.instruction.squat": "وضع الكاميرا: بمستوى الخصر، منظر جانبي مباشر.",
   "coach.instruction.pushup": "وضع الكاميرا: على مستوى الأرض، زاوية جانبية 45 درجة.",
   "coach.instruction.pushup_setup": "أبقِ ذراعيك مفرودتين في وضع البلانك لمدة 3 ثوانٍ.",
@@ -87,11 +80,9 @@
   "coach.instruction.pullup_setup": "أبقِ ذراعيك مفرودتين فوق رأسك لمدة 3 ثوانٍ.",
   "coach.label.setup": "إعداد",
   "coach.label.elbow_angle": "زاوية الكوع",
-
   "tracker.tab.plan": "📋 الخطة",
   "tracker.tab.progress": "📈 التقدم",
   "tracker.tab.volume": "🔥 الحجم",
-
   "tracker.plan.title": "📋 خطة تمريني",
   "tracker.plan.regenerate": "🔄 إعادة إنشاء الخطة",
   "tracker.plan.regenerate_title": "اطلب من الذكاء الاصطناعي إعادة إنشاء الخطة",
@@ -110,7 +101,6 @@
   "tracker.plan.no_data": "لا توجد بيانات.",
   "tracker.plan.could_not_load": "تعذر تحميل السجل.",
   "tracker.plan.volume_summary": "📊 ملخص الحجم:",
-
   "tracker.progress.title": "📈 متتبع التحميل التدريجي",
   "tracker.progress.weeks_4": "٤ أسابيع",
   "tracker.progress.weeks_8": "٨ أسابيع",
@@ -130,12 +120,10 @@
   "tracker.progress.empty_hint": "ابدأ بتسجيل المجموعات عبر المدرب الذكي لرؤية تقدمك.",
   "tracker.progress.chart_e1rm": "1RM المقدر (كجم)",
   "tracker.progress.chart_volume": "الحجم (كجم)",
-
   "tracker.pr.title": "🏆 الأرقام القياسية الشخصية",
   "tracker.pr.best_e1rm": "أفضل 1RM مقدر:",
   "tracker.pr.best_set": "أفضل مجموعة:",
   "tracker.pr.best_volume_set": "أفضل حجم (مجموعة):",
-
   "tracker.volume.title": "🔥 حجم العضلات الأسبوعي",
   "tracker.volume.this_week": "هذا الأسبوع",
   "tracker.volume.last_week": "الأسبوع الماضي",
@@ -145,7 +133,6 @@
   "tracker.volume.legend_done": "مكتمل",
   "tracker.volume.legend_remaining": "متبقي",
   "tracker.volume.legend_info": "الهدف بناءً على مستوى الخبرة + الهدف",
-
   "splits.push": "دفع",
   "splits.pull": "سحب",
   "splits.legs": "أرجل",
@@ -172,11 +159,9 @@
   "splits.push_2": "دفع (٢)",
   "splits.pull_2": "سحب (٢)",
   "splits.day_n": "يوم {n}",
-
   "tracker.stat.sets": "مجموعات",
   "tracker.stat.vol_kg": "حجم (كجم)",
   "tracker.stat.best": "أفضل",
-
   "wizard.title.onboarding": "دعنا نتعرف عليك",
   "wizard.title.update": "تحديث الملف الشخصي",
   "wizard.step_of": "الخطوة {current} من {total}",
@@ -185,13 +170,11 @@
   "wizard.btn.finish": "إنهاء",
   "wizard.btn.cancel": "إلغاء",
   "wizard.btn.saving": "جارٍ الحفظ...",
-
   "wizard.label.name": "ماذا نناديك؟",
   "wizard.placeholder.name": "اسمك",
   "wizard.label.coach_name": "سمِّ مدربك",
   "wizard.placeholder.coach_name": "نيوتري سينك",
   "wizard.hint.coach_name": "أعطِ مدربك الذكي اسماً — أو احتفظ بالاسم الافتراضي.",
-
   "wizard.label.gender": "الجنس",
   "wizard.option.gender.male": "ذكر",
   "wizard.option.gender.female": "أنثى",
@@ -200,7 +183,6 @@
   "wizard.placeholder.height": "١٧٥",
   "wizard.label.weight": "الوزن (كجم)",
   "wizard.placeholder.weight": "٧٠",
-
   "wizard.label.goal": "هدف اللياقة",
   "wizard.option.goal.lose_weight": "إنقاص الوزن",
   "wizard.option.goal.build_muscle": "بناء العضلات",
@@ -212,7 +194,6 @@
   "wizard.option.experience.beginner": "مبتدئ (٠-١ سنة)",
   "wizard.option.experience.intermediate": "متوسط (١-٣ سنوات)",
   "wizard.option.experience.advanced": "متقدم (٣+ سنوات)",
-
   "wizard.label.sport": "النشاط الرئيسي / الرياضة",
   "wizard.option.sport.gym": "صالة رياضية / كمال أجسام",
   "wizard.option.sport.running": "الجري",
@@ -249,7 +230,6 @@
   "wizard.placeholder.1rm_weight": "الوزن (كجم)",
   "wizard.btn.add_1rm": "+ إضافة سجل 1RM",
   "wizard.label.split_day": "اليوم {n}",
-
   "wizard.label.diet_type": "نوع النظام الغذائي",
   "wizard.option.diet.balanced": "متوازن / عادي",
   "wizard.option.diet.low_carb": "قليل الكربوهيدرات",
@@ -263,7 +243,11 @@
   "wizard.hint.calories": "سنقدّر هذا بناءً على بياناتك إن لم تكن متأكداً.",
   "wizard.label.allergies": "الحساسية / عدم التحمل",
   "wizard.placeholder.allergies": "مثال: فول سوداني، جلوتين، ألبان (اختياري)",
-
+  "push.title": "تفعيل التذكيرات",
+  "push.subtitle": "احصل على تذكيرات مخصصة للتمارين والوجبات للبقاء على المسار الصحيح.",
+  "push.enable": "تفعيل التذكيرات",
+  "push.later": "ربما لاحقاً",
+  "push.error.denied": "نحتاج إلى إذن لإرسال التنبيهات. قد تحتاج إلى إلغاء حظر التنبيهات في إعدادات المتصفح نظراً لأنك في وضع التصفح المتخفي/قمت بحظرها مسبقاً.",
   "validation.dob_future": "لا يمكن أن يكون تاريخ الميلاد في المستقبل.",
   "validation.dob_range": "يرجى إدخال تاريخ ميلاد صالح (العمر ١٠-١٢٠).",
   "validation.height_range": "يرجى إدخال طول صالح بالسم (٥٠-٣٠٠).",
@@ -275,7 +259,6 @@
   "validation.days_min": "يجب أن تكون أيام التمرين في الأسبوع واحد على الأقل.",
   "validation.calories_range": "يرجى إدخال تقدير واقعي للسعرات اليومية (٥٠٠ - ١٠,٠٠٠).",
   "validation.feedback_min_chars": "يرجى كتابة ١٠ أحرف على الأقل.",
-
   "feedback.header": "قيّم هذه الإجابة",
   "feedback.like": "أعجبني",
   "feedback.dislike": "لم يعجبني",
@@ -285,12 +268,10 @@
   "feedback.sending": "جارٍ الإرسال...",
   "feedback.error": "فشل حفظ التقييم. حاول مرة أخرى.",
   "feedback.thanks": "شكراً لتقييمك!",
-
   "profile.saved": "تم حفظ الملف الشخصي! مرحباً، {name}.",
   "profile.calorie_target": "هدف السعرات: {calories} سعرة",
   "profile.save_error": "خطأ في حفظ الملف الشخصي: {error}",
   "profile.days_auto_derived": "محسوب تلقائياً من جدول التقسيم",
-
   "equipment.category.chest_arms_machines": "أجهزة الصدر والذراعين",
   "equipment.category.shoulder_machines": "أجهزة الكتف",
   "equipment.category.back_machines": "أجهزة الظهر",
@@ -306,7 +287,6 @@
   "equipment.category.bodyweight_accessories": "وزن الجسم وإكسسوارات",
   "equipment.category.bodyweight_equipment": "معدات وزن الجسم",
   "equipment.category.custom": "مخصص",
-
   "muscle.chest": "الصدر",
   "muscle.back": "الظهر",
   "muscle.quads": "العضلة الرباعية",
@@ -322,17 +302,14 @@
   "muscle.rear_delts": "الدالية الخلفية",
   "muscle.forearms": "الساعدين",
   "muscle.traps": "شبه المنحرفة",
-
   "time.min": "دقيقة",
   "time.seconds_short": "ث",
   "units.kg": "كجم",
   "units.reps": "تكرار",
   "units.sets": "مجموعات",
-
   "lang.picker_label": "اللغة",
   "lang.en": "English",
   "lang.ar": "العربية",
-
   "error.feedback_comment_short": "يجب أن يكون تعليق الملاحظات 10 أحرف على الأقل.",
   "error.feedback_value_invalid": "قيمة التقييم يجب أن تكون 1 (إعجاب) أو -1 (عدم إعجاب).",
   "error.reps_zero": "عدد التكرارات يجب أن يكون أكبر من صفر.",

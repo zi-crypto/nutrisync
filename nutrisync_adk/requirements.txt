@@ -13,3 +13,5 @@ pytest-asyncio
 asyncpg
 tavily-python
 posthog
+pywebpush
+apscheduler

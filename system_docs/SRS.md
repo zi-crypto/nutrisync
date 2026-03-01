@@ -23,6 +23,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
 ### 2.2 Product Functions
 - **User Authentication**: Sign in and sign up functionality via Supabase Auth.
 - **Onboarding Wizard**: Multi-step user profile setup including physical stats, goals, experience level, equipment access, granular equipment selection (chip/tag UI with 72+ presets across Gym/Home/Bodyweight tiers), workout schedules, diet typings, allergies, and sport types.
+- **PWA Push Notifications**: Personalized, heuristically-driven push notifications for sleep, nutrition, workout, and late-night macro reminders leveraging VAPID keys, Service Workers, and an APScheduler-driven Python backend. Includes a custom UI opt-in overlay to maximize permission rates.
 - **AI Chat Coach**: Conversational interface for tailored fitness/nutrition advice. Maintains context of user profile, daily goals, and persistent context notes.
 - **Data Logging**: Logging workouts, nutrition, sleep, and body composition directly through chat utilizing AI tool calls.
 - **Data Visualization**: AI agent can generate charts (e.g., body weight trends, nutrition breakdown) using QuickChart.io.
@@ -127,6 +128,20 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - Returns `{success, exercise_name, set_number, reps, weight_kg, volume_load, is_pr, pr_type}`.
   - Tracks `api_live_coach_logged` event in PostHog with exercise, reps, weight, set number, PR metadata.
 - **Validation**: Returns HTTP 400 (`"error.reps_zero"`) if `reps <= 0`.
+
+### FR-NOTIF-01: Personalized PWA Push Notifications
+- **Description**: The system must act as an installable Progressive Web App (PWA) capable of receiving native push notifications outside of the active browser session, reminding users to log habits and hit nutritional goals based on smart heuristics.
+- **Implementation**:
+  - **Opt-in Flow**: Frontend displays a custom, branded glassmorphism overlay explicitly outlining the value proposition before triggering the native browser `Notification.requestPermission()` prompt to protect the gesture token and improve opt-in rates. Supports Incognito blocking detection. Includes Arabic translations.
+  - **Service Worker**: Uses standard W3C Web Push API via `service-worker.js` and `manifest.json`. Submits encrypted VAPID endpoints to `/api/notifications/subscribe` (saved to Supabase `push_subscriptions` table securely via RLS).
+  - **Localization (i18n)**: Evaluates `user_profile.language` (`en` or `ar`) per user during the cron execution to inject translated Arabic titles and bodies for all push notifications.
+  - **Background Scheduler**: Python backend `main.py` utilizes `APScheduler` to run recurring asynchronous checks at centralized default times against user data.
+  - **Smart Heuristics (Zero-Cost LLM Bypass)**: 
+    - *Morning Check (9:00 AM)*: Checks `sleep_logs` for yesterday. If missing, sends: "Did you sleep well? Log your sleep from last night."
+    - *Afternoon Check (2:00 PM)*: Checks `nutrition_logs` for today. If empty, sends: "Don't forget to track your lunch to stay on top of your macros."
+    - *Evening Workout Check (8:00 PM)*: Dynamically pulls the user's `user_profile` active `split_structure` and `workout_logs`. If the next scheduled day is not "Rest" and hasn't been logged today, sends: "Did you hit your [Split Day] workout today? Log it now to keep up the momentum!"
+    - *Late-Night Macro Check (10:00 PM)*: Queries `user_profile` macro goals (`daily_calorie_target`, `daily_protein_target_gm`) dynamically minus consumed totals from `nutrition_logs`. If the user is missing >150 kcal or >15g protein, sends a targeted warning (e.g. "You still need 400 kcal and 30g protein today! Grab a high-protein snack before bed.").
+    - *Bi-Weekly Body Comp (Wed/Sun 8:00 AM)*: Queries `body_composition_logs` for entries within the last 72 hours. If empty, sends a targeted warning (e.g. "Time for a weigh-in! Log your current body weight to keep your progress charts accurate.") to ensure at least 2 distant weight logs per week.
 
 ### FR-DATA-01: Chat History Persistence
 - **Description**: The system must persist chat history, including tool call artifacts and base64 chart payloads.
@@ -250,6 +265,7 @@ NutriSync is comprised of a FastAPI-based backend, a vanilla JS/HTML/CSS fronten
   - `workout_logs`: Tracks exercise type, duration, calories, avg heart rate, hr recovery, and TSS. `id` is UUID and serves as FK target for `exercise_logs.workout_log_id`.
   - `workout_plan_exercises`: AI-prescribed workout plan per split day. Stores exercise name, compound/isolation type, target muscles (text array), sets, rep range (low/high), load %1RM, rest seconds, `superset_group` (int, nullable — exercises sharing same group number on same day are supersetted), and coaching notes. Linked to `workout_splits` via `split_id` FK. Unique index on `(user_id, split_id, split_day_name, exercise_order)`.
   - `exercise_logs`: Set-level performance logging for progressive overload tracking. Stores exercise name, set number, weight_kg, reps, RPE (1-10), warmup flag, PR flag (auto-detected), and auto-computed `volume_load` (GENERATED ALWAYS AS `weight_kg * reps` STORED). Optional UUID FK to `workout_logs(id)` ON DELETE CASCADE for session linking. 7 optimized indexes including partial indexes for PR and weight lookups (`WHERE is_warmup = false`).
+  - `push_subscriptions`: Stores PWA push manager subscription objects (`endpoint`, `p256dh`, `auth`) linked to `user_id` allowing backend to dispatch VAPID payloads via `pywebpush`. Secured via RLS.
   - `scores_snapshots`, `*_improvement_snapshots`: Snapshots of historical user health scores populated by the `user-improvement-scorer` edge function.
   - `sessions`, `app_states`, `user_states`, `events`, `adk_internal_metadata`: Tables managed internally by the Google ADK for agent session state and execution tracking.
 

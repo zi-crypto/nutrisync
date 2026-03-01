@@ -15,15 +15,30 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("NutriSync")
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 app = FastAPI()
 runner = NutriSyncRunner()
+scheduler = AsyncIOScheduler()
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("NutriSync ADK is starting up...")
+    try:
+        from .services.notifications import run_morning_check, run_afternoon_check, run_evening_check, run_night_check, run_body_comp_check
+        scheduler.add_job(run_morning_check, 'cron', hour=9, minute=0)
+        scheduler.add_job(run_afternoon_check, 'cron', hour=14, minute=0)
+        scheduler.add_job(run_evening_check, 'cron', hour=20, minute=0)
+        scheduler.add_job(run_night_check, 'cron', hour=22, minute=0)
+        scheduler.add_job(run_body_comp_check, 'cron', day_of_week='wed,sun', hour=8, minute=0)
+        scheduler.start()
+        logger.info("Notification scheduler started.")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    scheduler.shutdown()
     posthog_shutdown()
     logger.info("PostHog analytics flushed and shut down.")
 
@@ -736,5 +751,62 @@ async def serve_index():
     html = template.render(
         posthog_api_key=_POSTHOG_API_KEY,
         posthog_host=_POSTHOG_HOST,
+        vapid_public_key=os.getenv("VAPID_PUBLIC_KEY", "")
     )
     return HTMLResponse(content=html)
+
+# ── Notifications API ──────────────────────────────────────────────────────
+
+class PushSubscriptionRequest(BaseModel):
+    user_id: str
+    endpoint: str
+    p256dh: str
+    auth: str
+
+@app.post("/api/notifications/subscribe")
+async def subscribe_push(req: PushSubscriptionRequest):
+    try:
+        data = {
+            "user_id": req.user_id,
+            "endpoint": req.endpoint,
+            "p256dh": req.p256dh,
+            "auth": req.auth
+        }
+        # Upsert based on endpoint
+        existing = runner.supabase.table("push_subscriptions").select("id").eq("endpoint", req.endpoint).execute()
+        if existing.data:
+            runner.supabase.table("push_subscriptions").update(data).eq("endpoint", req.endpoint).execute()
+        else:
+            runner.supabase.table("push_subscriptions").insert(data).execute()
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error subscribing push: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/notifications/test-trigger")
+async def test_trigger_push(req: Request):
+    try:
+        body = await req.json()
+        user_id = body.get("user_id")
+        if not user_id: return {"error": "Missing user_id"}
+        from .services.notifications import get_supabase, get_users_with_subscriptions, send_push_message, get_user_language
+        import json
+        sb = get_supabase()
+        subs = get_users_with_subscriptions(sb)
+        for sub in subs:
+            if sub["user_id"] == user_id:
+                lang = get_user_language(sb, user_id)
+                if lang == "ar":
+                    title = "إشعار تجريبي! 🚀"
+                    body = "هذا إشعار تجريبي من نيوتري سينك."
+                else:
+                    title = "Test Ping! 🚀"
+                    body = "This is a test notification from NutriSync."
+                    
+                send_push_message(
+                    {"endpoint": sub["endpoint"], "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]}}, 
+                    json.dumps({"title": title, "body": body})
+                )
+        return {"status": "success"}
+    except Exception as e:
+         return {"error": str(e)}
